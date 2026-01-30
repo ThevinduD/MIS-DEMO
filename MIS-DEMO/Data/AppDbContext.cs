@@ -23,6 +23,9 @@ namespace MIS_DEMO.Data
         public DbSet<VwSalesReturnFact> VW_SALES_RETURN_FACT { get; set; }
         public DbSet<WKF_MAP_REP_ASM> WKF_MAP_REP_ASM { get; set; }
         public DbSet<WKF_MAP_SM_ASM> WKF_MAP_SM_ASM { get; set; }
+        public DbSet<DirTeamMap> DIR_TEAM_MAP { get; set; }
+        public DbSet<WkfMapAsmDir> WKF_MAP_ASM_DIR { get; set; }
+
 
     }
 }

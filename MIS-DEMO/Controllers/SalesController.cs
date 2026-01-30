@@ -1,10 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using MIS_DEMO.Data;
+using MIS_DEMO.Models;
 using MIS_DEMO.Models.ViewModels;
 using MIS_DEMO.Services;
 using System.Globalization;
-using Microsoft.Extensions.Caching.Memory;
 
 
 namespace MIS_DEMO.Controllers
@@ -32,55 +33,49 @@ namespace MIS_DEMO.Controllers
             var userType = HttpContext.Session.GetString("UserType");
             var salesRepCode = HttpContext.Session.GetString("SalesRepCode");
 
-
             if (string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(userType))
-            {
                 return RedirectToAction("Login", "Account");
-            }
 
-            // 2. Get accessible rep codes (REP / ASM / SM logic)
-            var repCodes = _salesAccessService.GetAccessibleRepCodes(
-                userType,
-                userName,
-                salesRepCode
-            );
-
-            if (!repCodes.Any())
-            {
-                return View(new SalesSummaryViewModel());
-            }
-
-            // 3. Date ranges
-            //var today = DateTime.Today;
+            // DEV date
             var today = new DateTime(2025, 11, 20);
             var yesterday = today.AddDays(-1);
             var thisMonthStart = new DateTime(today.Year, today.Month, 1);
             var nextMonthStart = thisMonthStart.AddMonths(1);
             var lastMonthStart = thisMonthStart.AddMonths(-1);
-            var lastMonthEnd = thisMonthStart.AddDays(-1);
 
+            //  cache key (no need teamCode now, since access is resolved into repCodes)
             var cacheKey = $"salesSummary:{userName}:{userType}:{salesRepCode}:{today:yyyyMMdd}";
-
             if (_cache.TryGetValue(cacheKey, out SalesSummaryViewModel cachedModel))
-            {
                 return View(cachedModel);
-            }
 
-            // 4. Base query - sales
+            //  1) Get access rep codes for ALL types (REP/ASM/SM/Director)
+            var repCodes = _salesAccessService.GetAccessibleRepCodes(userType, userName, salesRepCode);
+
+            //  2) Detect "L006 director = ALL"
+            var isAll = repCodes.Count == 1 && repCodes[0] == "__ALL__";
+
+            //  3) Build base queries
             var salesQuery = _context.VW_SALES_FACT
                 .AsNoTracking()
-                .Where(x => repCodes.Contains(x.SalesRepCode) && x.LineTotal > 0);
+                .Where(x => x.LineTotal > 0);
 
-            // 4. Base query - returns
             var returnQuery = _context.VW_SALES_RETURN_FACT
                 .AsNoTracking()
-                .Where(x => repCodes.Contains(x.SalesRepCode) && x.LineTotal > 0);
+                .Where(x => x.LineTotal > 0);
 
+            //  4) Apply rep filter only when NOT ALL
+            if (!isAll)
+            {
+                if (!repCodes.Any())
+                    return View(new SalesSummaryViewModel());
 
-            // 5. Build ViewModel
+                salesQuery = salesQuery.Where(x => repCodes.Contains(x.SalesRepCode));
+                returnQuery = returnQuery.Where(x => repCodes.Contains(x.SalesRepCode));
+            }
+
+            //  5) Calculate totals
             var model = new SalesSummaryViewModel
             {
-                //SALES
                 TodaySales = salesQuery
                     .Where(x => x.RefDate >= today && x.RefDate < today.AddDays(1))
                     .Sum(x => (decimal?)x.LineTotal) ?? 0,
@@ -90,17 +85,13 @@ namespace MIS_DEMO.Controllers
                     .Sum(x => (decimal?)x.LineTotal) ?? 0,
 
                 ThisMonthSales = salesQuery
-                    .Where(x =>
-                        x.RefDate >= thisMonthStart &&
-                        x.RefDate < nextMonthStart)
+                    .Where(x => x.RefDate >= thisMonthStart && x.RefDate < nextMonthStart)
                     .Sum(x => (decimal?)x.LineTotal) ?? 0,
 
                 LastMonthSales = salesQuery
                     .Where(x => x.RefDate >= lastMonthStart && x.RefDate < thisMonthStart)
                     .Sum(x => (decimal?)x.LineTotal) ?? 0,
 
-
-                // RETURNS
                 TodayReturns = returnQuery
                     .Where(x => x.RefDate >= today && x.RefDate < today.AddDays(1))
                     .Sum(x => (decimal?)x.LineTotal) ?? 0,
@@ -120,13 +111,15 @@ namespace MIS_DEMO.Controllers
 
             _cache.Set(cacheKey, model, new MemoryCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(20)
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(10)
             });
 
             return View(model);
         }
 
-        public IActionResult PeriodDetails(string period)
+
+
+        public IActionResult PeriodDetails(string period, string? from, string? to)
         {
             var userName = HttpContext.Session.GetString("Username");
             var userType = HttpContext.Session.GetString("UserType");
@@ -137,47 +130,71 @@ namespace MIS_DEMO.Controllers
 
             var repCodes = _salesAccessService.GetAccessibleRepCodes(userType, userName, salesRepCode);
             if (!repCodes.Any())
-                return View("TodayDetails", new TodaySalesDetailsViewModel()); // reuse same view
+                return View("TodayDetails", new TodaySalesDetailsViewModel());
 
             // Dev date (replace with DateTime.Today later)
             var baseToday = new DateTime(2025, 11, 20);
 
             DateTime startDate;
-            DateTime endDate;
+            DateTime endDateExclusive;
             string title;
 
-            switch ((period ?? "").ToLower())
+            var p = (period ?? "").ToLower();
+
+            if (p == "select")
             {
-                case "yesterday":
-                    startDate = baseToday.AddDays(-1);
-                    endDate = baseToday;
-                    title = "Yesterday Details";
-                    break;
+                // If user hasn't selected dates yet, show a default range (example: last 7 days)
+                if (!DateTime.TryParse(from, out var fromDt) || !DateTime.TryParse(to, out var toDt))
+                {
+                    startDate = baseToday.AddDays(-6).Date;
+                    endDateExclusive = baseToday.AddDays(1).Date; // inclusive UX
+                    title = "Custom Range Details";
+                }
+                else
+                {
+                    // inclusive end-date UX: to=2025-11-20 means include the full day
+                    startDate = fromDt.Date;
+                    endDateExclusive = toDt.Date.AddDays(1);
+                    title = "Custom Range Details";
+                }
+            }
+            else
+            {
+                switch (p)
+                {
+                    case "yesterday":
+                        startDate = baseToday.AddDays(-1);
+                        endDateExclusive = baseToday;
+                        title = "Yesterday Details";
+                        break;
 
-                case "thismonth":
-                    startDate = new DateTime(baseToday.Year, baseToday.Month, 1);
-                    endDate = startDate.AddMonths(1);
-                    title = "This Month Details";
-                    break;
+                    case "thismonth":
+                        startDate = new DateTime(baseToday.Year, baseToday.Month, 1);
+                        endDateExclusive = startDate.AddMonths(1);
+                        title = "This Month Details";
+                        break;
 
-                case "lastmonth":
-                    var thisMonthStart = new DateTime(baseToday.Year, baseToday.Month, 1);
-                    startDate = thisMonthStart.AddMonths(-1);
-                    endDate = thisMonthStart;
-                    title = "Last Month Details";
-                    break;
+                    case "lastmonth":
+                        var thisMonthStart = new DateTime(baseToday.Year, baseToday.Month, 1);
+                        startDate = thisMonthStart.AddMonths(-1);
+                        endDateExclusive = thisMonthStart;
+                        title = "Last Month Details";
+                        break;
 
-                case "today":
-                default:
-                    startDate = baseToday;
-                    endDate = baseToday.AddDays(1);
-                    title = "Today Details";
-                    break;
+                    case "today":
+                    default:
+                        startDate = baseToday;
+                        endDateExclusive = baseToday.AddDays(1);
+                        title = "Today Details";
+                        break;
+                }
             }
 
             var model = new TodaySalesDetailsViewModel
             {
-                Date = startDate
+                Date = startDate,
+                FromDate = startDate,
+                ToDate = endDateExclusive.AddDays(-1) // for UI display
             };
 
             // SALES
@@ -185,7 +202,7 @@ namespace MIS_DEMO.Controllers
                 .AsNoTracking()
                 .Where(x => repCodes.Contains(x.SalesRepCode)
                             && x.RefDate >= startDate
-                            && x.RefDate < endDate
+                            && x.RefDate < endDateExclusive
                             && x.LineTotal > 0);
 
             model.SalesTotal = salesQuery.Sum(x => (decimal?)x.LineTotal) ?? 0;
@@ -203,7 +220,8 @@ namespace MIS_DEMO.Controllers
                     SoldPrice = x.SoldPrice,
                     LineTotal = x.LineTotal,
                     SupName = x.SupName,
-                    SalesRepCode = x.SalesRepCode
+                    SalesRepCode = x.SalesRepCode,
+                    SalesRepName = x.SalesRepName
                 })
                 .OrderByDescending(x => x.LineTotal)
                 .Take(300)
@@ -214,7 +232,8 @@ namespace MIS_DEMO.Controllers
                 .AsNoTracking()
                 .Where(x => repCodes.Contains(x.SalesRepCode)
                             && x.RefDate >= startDate
-                            && x.RefDate < endDate);
+                            && x.RefDate < endDateExclusive
+                            && x.LineTotal > 0);
 
             model.ReturnTotal = returnQuery.Sum(x => (decimal?)x.LineTotal) ?? 0;
 
@@ -232,17 +251,20 @@ namespace MIS_DEMO.Controllers
                     ReturnedPrice = x.ReturnedPrice,
                     LineTotal = x.LineTotal,
                     SupName = x.SupName,
-                    SalesRepCode = x.SalesRepCode
+                    SalesRepCode = x.SalesRepCode,
+                    SalesRepName = x.SalesRepName
                 })
                 .OrderByDescending(x => x.LineTotal)
                 .Take(300)
                 .ToList();
 
             ViewBag.PeriodTitle = title;
-            ViewBag.PeriodRange = $"{startDate:yyyy-MM-dd} → {(endDate.AddDays(-1)):yyyy-MM-dd}";
+            ViewBag.PeriodRange = $"{startDate:yyyy-MM-dd} → {endDateExclusive.AddDays(-1):yyyy-MM-dd}";
+            ViewBag.Period = p; // so cshtml can show range form only for select
 
-            return View("TodayDetails", model); // reuse same cshtml
+            return View("TodayDetails", model);
         }
+
 
         [HttpGet]
         public IActionResult ProductWiseData(string? period, string? from, string? to, string metric = "value")
@@ -358,7 +380,7 @@ namespace MIS_DEMO.Controllers
 
             _cache.Set(cacheKey, result, new MemoryCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(20)
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(10)
             });
 
             return Json(result);

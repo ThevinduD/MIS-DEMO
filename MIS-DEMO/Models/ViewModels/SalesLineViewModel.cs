@@ -19,5 +19,6 @@
 
         public string? SupName { get; set; }
         public string? SalesRepCode { get; set; }
+        public string? SalesRepName { get; set; }
     }
 }

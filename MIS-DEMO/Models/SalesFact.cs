@@ -15,6 +15,7 @@ namespace MIS_DEMO.Models
 
         public string ItemCode { get; set; }
         public string ItemDescription { get; set; }
+        public string Pat_Name { get; set; }
 
         public decimal SoldPrice { get; set; }
         public decimal Qty { get; set; }
@@ -24,5 +25,6 @@ namespace MIS_DEMO.Models
         public string SupName { get; set; }
 
         public string SalesRepCode { get; set; }
+        public string SalesRepName { get; set; }
     }
 }

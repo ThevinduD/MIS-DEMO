@@ -54,6 +54,7 @@ namespace MIS_DEMO.Controllers
 
             HttpContext.Session.SetString("UserType", repMap?.Type ?? "");
             HttpContext.Session.SetString("SalesRepCode", repMap?.SalesRepCode ?? "");
+            HttpContext.Session.SetString("TeamCode", repMap?.TeamCode ?? "");
 
             return RedirectToAction("Index", "Home");
         }

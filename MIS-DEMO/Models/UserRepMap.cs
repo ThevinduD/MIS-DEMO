@@ -15,6 +15,9 @@ namespace MIS_DEMO.Models
         public string Type { get; set; }
 
         [Column("SalesRepCode")]
-        public string SalesRepCode { get; set; } 
+        public string SalesRepCode { get; set; }
+
+        [Column("TeamCode")]
+        public string TeamCode { get; set; }
     }
 }

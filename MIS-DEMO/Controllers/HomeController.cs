@@ -26,11 +26,15 @@ namespace MIS_DEMO.Controllers
             var userName = HttpContext.Session.GetString("Username");
             var userType = HttpContext.Session.GetString("UserType");
             var salesRepCode = HttpContext.Session.GetString("SalesRepCode");
+            var teamCode = HttpContext.Session.GetString("TeamCode");
 
             var model = new DashboardViewModel();
 
             var today = new DateTime(2025, 11, 20);
             //var today = DateTime.Today;
+
+            var dayStart = today;
+            var dayEnd = today.AddDays(1);
 
             if (userType == "REP")
             {
@@ -38,9 +42,50 @@ namespace MIS_DEMO.Controllers
                     .AsNoTracking()
                     .Where(x =>
                         x.SalesRepCode == salesRepCode &&
-                        x.RefDate >= today &&
-                        x.RefDate < today.AddDays(1))
+                        x.RefDate >= dayStart &&
+                        x.RefDate < dayEnd)
                     .Sum(x => (decimal?)x.LineTotal) ?? 0;
+            }
+
+            else if (userType == "DIRECTOR")
+            {
+                // Director special case: L006 sees everything
+                if (teamCode == "L006")
+                {
+                    model.TodayTotalSales = _context.VW_SALES_FACT
+                        .AsNoTracking()
+                        .Where(x => x.RefDate >= dayStart
+                                    && x.RefDate < dayEnd)
+                        .Sum(x => (decimal?)x.LineTotal) ?? 0;
+                }
+                else
+                {
+                    // Get team codes mapped to this Director
+                    var teamCodes = _context.DIR_TEAM_MAP
+                        .AsNoTracking()
+                        .Where(x => x.UserNameDir == userName)
+                        .Select(x => x.TeamCode)
+                        .ToList();
+
+                    // Optional: include his own TeamCode too (in case mapping table misses it)
+                    if (!string.IsNullOrEmpty(teamCode) && !teamCodes.Contains(teamCode))
+                        teamCodes.Add(teamCode);
+
+                    if (!teamCodes.Any())
+                    {
+                        model.TodayTotalSales = 0;
+                    }
+                    else
+                    {
+                        // Filter by Pat_Name (contains teamcode as you said)
+                        model.TodayTotalSales = _context.VW_SALES_FACT
+                            .AsNoTracking()
+                            .Where(x => teamCodes.Contains(x.Pat_Name)
+                                        && x.RefDate >= dayStart
+                                        && x.RefDate < dayEnd)
+                            .Sum(x => (decimal?)x.LineTotal) ?? 0;
+                    }
+                }
             }
 
             else if (userType == "ASM")

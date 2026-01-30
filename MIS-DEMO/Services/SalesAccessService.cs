@@ -12,75 +12,149 @@ namespace MIS_DEMO.Services
             _context = context;
         }
 
-        public List<string> GetAccessibleRepCodes(
-            string userType,
-            string userName,
-            string? salesRepCode)
+        public List<string> GetAccessibleRepCodes(string userType, string userName, string? salesRepCode)
         {
-            var repCodes = new List<string>();
-
-            // REP
-            if (userType == "REP" && !string.IsNullOrEmpty(salesRepCode))
+            // ---------------- DIRECTOR ----------------
+            if (userType == "DIRECTOR")
             {
-                repCodes.Add(salesRepCode);
-                return repCodes;
+                // Get Director's TeamCode from WKF_USER_REP_MAP (same table you already use)
+                var dirTeamCode = _context.WKF_USER_REP_MAP
+                    .AsNoTracking()
+                    .Where(x => x.UserName == userName)
+                    .Select(x => x.TeamCode)
+                    .FirstOrDefault();
+
+                // L006 => ALL access (can't represent as repCodes list safely)
+                // We'll return a marker token.
+                if (dirTeamCode == "L006")
+                    return new List<string> { "__ALL__" };
+
+                // 1) Get mapped ASM/SM usernames under this Director
+                var mappedAsmOrSmUsers = _context.WKF_MAP_ASM_DIR
+                    .AsNoTracking()
+                    .Where(x => x.UserNameDir == userName)
+                    .Select(x => x.UserNameAsm)
+                    .Distinct()
+                    .ToList();
+
+                // 2) From mapped usernames, detect which ones are SMs
+                var smUsers = _context.WKF_MAP_SM_ASM
+                    .AsNoTracking()
+                    .Where(x => mappedAsmOrSmUsers.Contains(x.UserNameSM))
+                    .Select(x => x.UserNameSM)
+                    .Distinct()
+                    .ToList();
+
+                // 3) Expand SMs -> ASMs under those SMs
+                var asmsUnderSms = _context.WKF_MAP_SM_ASM
+                    .AsNoTracking()
+                    .Where(x => smUsers.Contains(x.UserNameSM))
+                    .Select(x => x.UserNameASM)
+                    .Distinct()
+                    .ToList();
+
+                // 4) Build the full ASM username set:
+                // - mapped ASMs directly (those not SMs)
+                // - plus ASMs under mapped SMs
+                var allAsmUsers = mappedAsmOrSmUsers
+                    .Union(asmsUnderSms)
+                    .Distinct()
+                    .ToList();
+
+                // 5) Get SalesRepCodes of those ASMs/SMs themselves (they sell!)
+                var asmSmOwnRepCodes = _context.WKF_USER_REP_MAP
+                    .AsNoTracking()
+                    .Where(x => allAsmUsers.Contains(x.UserName))
+                    .Select(x => x.SalesRepCode)
+                    .Where(code => !string.IsNullOrEmpty(code))
+                    .Distinct()
+                    .ToList();
+
+                // 6) Get REP SalesRepCodes under those ASMs
+                var repCodesUnderAsms = _context.WKF_MAP_REP_ASM
+                    .AsNoTracking()
+                    .Where(x => allAsmUsers.Contains(x.UserName))
+                    .Select(x => x.SalesRepCode)
+                    .Where(code => !string.IsNullOrEmpty(code))
+                    .Distinct()
+                    .ToList();
+
+                // 7) Combine everything
+                var finalCodes = asmSmOwnRepCodes
+                    .Union(repCodesUnderAsms)
+                    .Distinct()
+                    .ToList();
+
+                // 8) Add Director's own SalesRepCode (he sells + returns too)
+                if (!string.IsNullOrEmpty(salesRepCode) && !finalCodes.Contains(salesRepCode))
+                    finalCodes.Add(salesRepCode);
+
+                return finalCodes;
             }
 
-            // ASM / SM
+            // ---------------- REP ----------------
+            if (userType == "REP" && !string.IsNullOrEmpty(salesRepCode))
+                return new List<string> { salesRepCode };
+
+            // ---------------- ASM / SM ----------------
             if (userType == "ASM")
             {
-                // Check if SM
                 var isSM = _context.WKF_MAP_SM_ASM
                     .AsNoTracking()
                     .Any(x => x.UserNameSM == userName);
 
                 if (isSM)
                 {
-                    // 1. Get ASMs under SM
                     var asmUserNames = _context.WKF_MAP_SM_ASM
                         .AsNoTracking()
                         .Where(x => x.UserNameSM == userName)
                         .Select(x => x.UserNameASM)
                         .ToList();
 
-                    // 2. ASM own SalesRepCodes
                     var asmRepCodes = _context.WKF_USER_REP_MAP
                         .AsNoTracking()
                         .Where(x => asmUserNames.Contains(x.UserName))
                         .Select(x => x.SalesRepCode)
+                        .Where(code => !string.IsNullOrEmpty(code))
                         .ToList();
 
-                    // 3. REP SalesRepCodes under ASMs
                     var repRepCodes = _context.WKF_MAP_REP_ASM
                         .AsNoTracking()
                         .Where(x => asmUserNames.Contains(x.UserName))
                         .Select(x => x.SalesRepCode)
+                        .Where(code => !string.IsNullOrEmpty(code))
                         .ToList();
 
-                    repCodes = asmRepCodes
+                    var codes = asmRepCodes
                         .Union(repRepCodes)
+                        .Distinct()
                         .ToList();
+
+                    if (!string.IsNullOrEmpty(salesRepCode) && !codes.Contains(salesRepCode))
+                        codes.Add(salesRepCode);
+
+                    return codes;
                 }
                 else
                 {
-                    // Normal ASM → REPs under him
-                    repCodes = _context.WKF_MAP_REP_ASM
+                    var codes = _context.WKF_MAP_REP_ASM
                         .AsNoTracking()
                         .Where(x => x.UserName == userName)
                         .Select(x => x.SalesRepCode)
+                        .Where(code => !string.IsNullOrEmpty(code))
+                        .Distinct()
                         .ToList();
-                }
 
-                // 3. Add own sales if exists
-                if (!string.IsNullOrEmpty(salesRepCode) &&
-                    !repCodes.Contains(salesRepCode))
-                {
-                    repCodes.Add(salesRepCode);
+                    if (!string.IsNullOrEmpty(salesRepCode) && !codes.Contains(salesRepCode))
+                        codes.Add(salesRepCode);
+
+                    return codes;
                 }
             }
 
-            return repCodes;
+            return new List<string>();
         }
+
     }
 }
 

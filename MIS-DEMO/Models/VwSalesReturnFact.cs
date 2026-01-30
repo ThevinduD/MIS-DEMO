@@ -15,10 +15,12 @@ namespace MIS_DEMO.Models
         public DateTime RefDate { get; set; }
         public string ItemCode { get; set; }
         public string Description { get; set; }
+        public string Pat_Name { get; set; }
         public decimal Qty { get; set; }
         public decimal ReturnedPrice { get; set; }
         public decimal LineTotal { get; set; }
         public string SalesRepCode { get; set; }
+        public string SalesRepName { get; set; }
         public string SupCode { get; set; }
         public string SupName { get; set; }
 

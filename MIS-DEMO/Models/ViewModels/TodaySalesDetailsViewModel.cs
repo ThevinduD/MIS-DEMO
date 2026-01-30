@@ -11,5 +11,8 @@
         public decimal ReturnTotal { get; set; }
 
         public decimal NetTotal => SalesTotal - ReturnTotal;
+        public DateTime FromDate { get; set; }
+        public DateTime ToDate { get; set; }
+
     }
 }
