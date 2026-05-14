@@ -1,0 +1,63 @@
+﻿@model MIS_DEMO.Models.ViewModels.Collection.ReceiptDetailsViewModel
+
+@{
+    ViewData["Title"] = "Receipt Details";
+}
+
+<div class="px-2 px-md-3 mt-4">
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header text-white d-flex flex-wrap justify-content-between align-items-center" style="background-color: #1e3a8a;">
+            <div>
+                <h4 class="mb-0">@Model.ReceiptNo</h4>
+                <small class="text-white-50">Team: @Model.Team</small>
+            </div>
+
+            <a href="javascript:history.back()" class="btn btn-sm btn-outline-light mt-2 mt-md-0 fw-bold">
+                <i class="bi bi-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0 table-responsive">
+            <table class="table table-hover table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3" style="min-width: 80px">Invoice No</th>
+                        <th style="min-width: 120px">Invoice Date</th>
+                        <th>Payment Type</th>
+                        <th class="text-end">Invoice Total</th>
+                        <th class="text-end pe-4 text-primary">Amount Paid</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Invoices)
+                    {
+                        <tr>
+                            <td class="fw-bold ps-3">
+                                <a asp-controller="Collection"
+                                   asp-action="InvoiceDetails"
+                                   asp-route-invoNo="@row.InvoiceNo"
+                                   class="text-decoration-none text-primary">
+                                    @row.InvoiceNo
+                                </a>
+                            </td>
+                            <td>@(row.InvoiceDate?.ToString("yyyy-MM-dd") ?? "N/A")</td>
+                            <td><span class="badge bg-secondary">@row.PayType</span></td>
+                            <td class="text-end text-muted">@row.InvoiceTotal.ToString("N0")</td>
+                            <td class="text-end fw-bold pe-4 text-primary">@row.PaidAmount.ToString("N0")</td>
+                        </tr>
+                    }
+                    @if (!Model.Invoices.Any())
+                    {
+                        <tr><td colspan="5" class="text-center py-4 text-muted">No invoices found for this receipt.</td></tr>
+                    }
+                    <tr class="table-dark">
+                        <td colspan="4" class="text-end fw-bold">TOTAL RECEIPT AMOUNT:</td>
+                        <td class="text-end fw-bold fs-5 text-warning pe-4">@Model.TotalPaid.ToString("N0")</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

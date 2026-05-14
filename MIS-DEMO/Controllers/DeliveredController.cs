@@ -10,16 +10,11 @@ namespace MIS_DEMO.Controllers
     public class DeliveredController : Controller
     {
         private readonly AppDbContext _context;
-        private readonly SalesAccessService _salesAccessService;
         private readonly IDateProvider _dateProvider;
 
-        public DeliveredController(
-            AppDbContext context,
-            SalesAccessService salesAccessService,
-            IDateProvider dateProvider)
+        public DeliveredController(AppDbContext context, IDateProvider dateProvider)
         {
             _context = context;
-            _salesAccessService = salesAccessService;
             _dateProvider = dateProvider;
         }
 
@@ -50,44 +45,33 @@ namespace MIS_DEMO.Controllers
                     x.FDeliveryDate < nextMonthStart
                 );
 
-            // Access control (reuse service)
-            var repCodes = _salesAccessService.GetAccessibleRepCodes(userType, userName, salesRepCode);
-            bool isAll = repCodes.Count == 1 && repCodes[0] == "__ALL__";
-
-            if (!isAll && userType == "DIRECTOR")
+            // ==========================================
+            // NEW UNIFIED SECURITY LOGIC
+            // ==========================================
+            if (userType == "DIRECTOR" && teamCode == "L006")
             {
-                if (teamCode == "L006")
-                {
-                    // no filter
-                }
-                else
-                {
-                    var teamCodes = GetDirectorTeamCodes(userName, teamCode);
-                    if (!teamCodes.Any())
-                        return View(new DeliveredInvoicesViewModel
-                        {
-                            MonthStart = monthStart,
-                            MonthEndExclusive = nextMonthStart
-                        });
-
-                    // Director access by team code (Pat_Name)
-                    q = q.Where(x => x.Pat_Name != null && teamCodes.Contains(x.Pat_Name));
-                }
+                // Admin L006 sees everything - No filter applied
             }
-            else if (!isAll)
+            else
             {
-                // REP / ASM / SM / OTHER access by rep codes
-                if (repCodes == null || repCodes.Count == 0)
+                var repCodes = GetAllowedRepCodes(userName, userType);
+                if (!string.IsNullOrEmpty(salesRepCode) && !repCodes.Contains(salesRepCode))
+                    repCodes.Add(salesRepCode);
+
+                // If they have no reps assigned, return empty view
+                if (!repCodes.Any())
                     return View(new DeliveredInvoicesViewModel
                     {
                         MonthStart = monthStart,
                         MonthEndExclusive = nextMonthStart
                     });
 
+                // Filter by the unified list of SalesRepCodes
                 q = q.Where(x => repCodes.Contains(x.SalesRepCode));
             }
+            // ==========================================
 
-            // Join TEAM_MIS: Pat_Name(LocCode) -> LocShort
+            // Join TEAM_MIS: Pat_Name(LocCode) -> LocShort (Just for display names)
             var qWithTeam =
                 from inv in q
                 join tm in _context.TEAM_MIS.AsNoTracking()
@@ -123,24 +107,9 @@ namespace MIS_DEMO.Controllers
             };
 
             ViewBag.Title = "Delivered Invoices - Values in K";
-            ViewBag.SubTitle = $"{monthStart:yyyy-MM-dd} → {today:yyyyy-MM-dd}";
+            ViewBag.SubTitle = $"{monthStart:yyyy-MM-dd} → {today:yyyy-MM-dd}";
 
             return View(model);
-        }
-
-        private List<string> GetDirectorTeamCodes(string userName, string? sessionTeamCode)
-        {
-            var teamCodes = _context.DIR_TEAM_MAP
-                .AsNoTracking()
-                .Where(x => x.UserNameDir == userName)
-                .Select(x => x.TeamCode)
-                .Distinct()
-                .ToList();
-
-            if (!string.IsNullOrEmpty(sessionTeamCode) && !teamCodes.Contains(sessionTeamCode))
-                teamCodes.Add(sessionTeamCode);
-
-            return teamCodes;
         }
 
         [HttpGet]
@@ -170,32 +139,25 @@ namespace MIS_DEMO.Controllers
                     x.FDeliveryDate < nextMonthStart
                 );
 
-            // Access control
-            var repCodes = _salesAccessService.GetAccessibleRepCodes(userType, userName, salesRepCode);
-            bool isAll = repCodes.Count == 1 && repCodes[0] == "__ALL__";
-
-            if (!isAll && userType == "DIRECTOR")
+            // ==========================================
+            // NEW UNIFIED SECURITY LOGIC
+            // ==========================================
+            if (userType == "DIRECTOR" && teamCode == "L006")
             {
-                if (teamCode == "L006")
-                {
-                    // no filter
-                }
-                else
-                {
-                    var teamCodes = GetDirectorTeamCodes(userName, teamCode);
-                    if (!teamCodes.Any())
-                        return View("TeamInvoices", new TeamInvoicesViewModel { Team = team });
-
-                    q = q.Where(x => x.Pat_Name != null && teamCodes.Contains(x.Pat_Name));
-                }
+                // Admin L006 sees everything - No filter applied
             }
-            else if (!isAll)
+            else
             {
-                if (repCodes == null || repCodes.Count == 0)
+                var repCodes = GetAllowedRepCodes(userName, userType);
+                if (!string.IsNullOrEmpty(salesRepCode) && !repCodes.Contains(salesRepCode))
+                    repCodes.Add(salesRepCode);
+
+                if (!repCodes.Any())
                     return View("TeamInvoices", new TeamInvoicesViewModel { Team = team });
 
                 q = q.Where(x => repCodes.Contains(x.SalesRepCode));
             }
+            // ==========================================
 
             // Map Pat_Name -> LocShort
             var qWithTeam =
@@ -265,6 +227,77 @@ namespace MIS_DEMO.Controllers
             ViewBag.SubTitle = $"{thisMonthStart:yyyy-MM-dd} → {nextMonthStart.AddDays(-1):yyyy-MM-dd}";
 
             return View("TeamInvoices", model);
+        }
+
+        // ==========================================
+        // PRIVATE SECURITY HELPER
+        // ==========================================
+
+        private List<string> GetAllowedRepCodes(string userName, string userType)
+        {
+
+            var cachedReps = HttpContext.Session.GetString("MyAllowedReps");
+            if (!string.IsNullOrEmpty(cachedReps))
+            {
+                return cachedReps.Split(',').ToList(); // Instantly return from memory!
+            }
+
+            var repCodes = new List<string>();
+
+            if (userType == "REP")
+            {
+                return repCodes;
+            }
+
+            else if (userType == "ASM" || userType == "OTHER")
+            {
+                // First, check if this user is actually an SM by looking them up in the mapping table
+                var assignedASMs = _context.WKF_MAP_SM_ASM
+                    .Where(x => x.UserNameSM == userName)
+                    .Select(x => x.UserNameASM)
+                    .ToList();
+
+                if (assignedASMs.Any())
+                {
+                    // ---> THEY ARE AN SM <---
+                    repCodes = _context.WKF_MAP_REP_ASM_MIS
+                        .Where(x => assignedASMs.Contains(x.UserName) || x.UserName == userName)
+                        .Select(x => x.SalesRepCode)
+                        .Distinct()
+                        .ToList();
+                }
+                else
+                {
+                    // ---> THEY ARE A NORMAL ASM (or OTHER) <---
+                    repCodes = _context.WKF_MAP_REP_ASM_MIS
+                        .Where(x => x.UserName == userName)
+                        .Select(x => x.SalesRepCode)
+                        .Distinct()
+                        .ToList();
+                }
+            }
+
+            else if (userType == "DIRECTOR")
+            {
+                var assignedUserNames = _context.WKF_MAP_ASM_DIR
+                    .Where(x => x.UserNameDir == userName)
+                    .Select(x => x.UserNameAsm)
+                    .ToList();
+
+                repCodes = _context.WKF_MAP_REP_ASM_MIS
+                    .Where(x => assignedUserNames.Contains(x.UserName))
+                    .Select(x => x.SalesRepCode)
+                    .Distinct()
+                    .ToList();
+            }
+
+            // Save the final list to the Session so we never hit the DB again for this user!
+            if (repCodes.Any())
+            {
+                HttpContext.Session.SetString("MyAllowedReps", string.Join(",", repCodes));
+            }
+
+            return repCodes;
         }
     }
 }

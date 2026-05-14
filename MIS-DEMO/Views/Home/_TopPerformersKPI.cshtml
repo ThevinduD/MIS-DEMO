@@ -16,7 +16,8 @@
                     <button class="btn btn-sm btn-link text-decoration-none p-0 fs-5"
                             onclick="loadTopPerformersKpi(@Model.CurrentMonthOffset, @((!Model.IsTop).ToString().ToLower()))"
                             title="Switch to @(Model.IsTop ? "Lowest" : "Top")">
-                        🔃
+
+                        @(Model.IsTop ? "⬇️" : "⬆️")
                     </button>
                 </div>
                 <small class="text-muted fw-semibold">@Model.MonthLabel</small>
@@ -33,8 +34,7 @@
             <table class="table table-borderless table-sm mb-0 mx-auto" style="max-width: 400px; background-color: transparent;">
                 <thead>
                     <tr class="border-bottom">
-                        <th class="fw-bold text-start text-muted" style="width:70px;">Team</th>
-                        <th class="fw-bold text-start text-muted" style="width:160px;">Rep Name</th>
+                        <th class="fw-bold text-start text-muted">Rep Name</th>
                         <th class="fw-bold text-end text-muted" style="width:120px;">Net Sale</th>
                     </tr>
                 </thead>
@@ -42,7 +42,7 @@
                     @if (Model.TopReps.Count == 0)
                     {
                         <tr>
-                            <td colspan="3" class="text-center py-3 text-muted">No sales found for @Model.MonthLabel.</td>
+                            <td colspan="2" class="text-center py-3 text-muted">No sales found for @Model.MonthLabel.</td>
                         </tr>
                     }
                     else
@@ -50,8 +50,7 @@
                         foreach (var rep in Model.TopReps)
                         {
                             <tr>
-                                <td class="text-start fw-semibold">@rep.Team</td>
-                                <td class="text-start text-truncate" style="max-width: 160px;" title="@rep.RepName">
+                                <td class="text-start fw-semibold text-truncate" style="max-width: 200px;" title="@rep.RepName">
                                     @rep.RepName
                                 </td>
                                 <td class="text-end fw-bold @(rep.NetSale < 0 ? "text-danger" : "")">

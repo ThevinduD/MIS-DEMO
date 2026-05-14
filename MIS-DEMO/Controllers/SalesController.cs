@@ -34,7 +34,7 @@ namespace MIS_DEMO.Controllers
             var userName = HttpContext.Session.GetString("Username");
             var userType = HttpContext.Session.GetString("UserType");
             var salesRepCode = HttpContext.Session.GetString("SalesRepCode");
-            var teamCode = HttpContext.Session.GetString("TeamCode"); // add this
+            var teamCode = HttpContext.Session.GetString("TeamCode");
 
             ViewBag.TodayIso = _dateProvider.Today.ToString("yyyy-MM-dd");
 
@@ -51,41 +51,29 @@ namespace MIS_DEMO.Controllers
             if (_cache.TryGetValue(cacheKey, out SalesSummaryViewModel cachedModel))
                 return View(cachedModel);
 
-            var repCodes = _salesAccessService.GetAccessibleRepCodes(userType, userName, salesRepCode);
-            bool isAll = repCodes.Count == 1 && repCodes[0] == "__ALL__";
-
             var salesQuery = _context.VW_SALES_FACT.AsNoTracking().Where(x => x.LineTotal > 0);
             var returnQuery = _context.VW_SALES_RETURN_FACT.AsNoTracking().Where(x => x.LineTotal > 0);
 
-            // ✅ SALES FILTERING
-            if (isAll)
+            // ==========================================
+            // NEW UNIFIED SECURITY LOGIC
+            // ==========================================
+            if (userType == "DIRECTOR" && teamCode == "L006")
             {
-                // L006 director => no filter
-            }
-            else if (userType == "DIRECTOR")
-            {
-                var teamCodes = GetDirectorTeamCodes(userName, teamCode);
-
-                if (!teamCodes.Any())
-                    return View(new SalesSummaryViewModel());
-
-                // IMPORTANT: director sales must be by TEAM
-                salesQuery = salesQuery.Where(x => x.Pat_Name != null && teamCodes.Contains(x.Pat_Name));
-
-                // returns: keep rep-based (no team field in return view)
-                if (!repCodes.Any())
-                    return View(new SalesSummaryViewModel());
-
-                returnQuery = returnQuery.Where(x => repCodes.Contains(x.SalesRepCode));
+                // Admin L006 sees everything - No filter applied
             }
             else
             {
+                var repCodes = GetAllowedRepCodes(userName, userType);
+                if (!string.IsNullOrEmpty(salesRepCode) && !repCodes.Contains(salesRepCode))
+                    repCodes.Add(salesRepCode);
+
                 if (!repCodes.Any())
                     return View(new SalesSummaryViewModel());
 
                 salesQuery = salesQuery.Where(x => repCodes.Contains(x.SalesRepCode));
                 returnQuery = returnQuery.Where(x => repCodes.Contains(x.SalesRepCode));
             }
+            // ==========================================
 
             var model = new SalesSummaryViewModel
             {
@@ -129,14 +117,16 @@ namespace MIS_DEMO.Controllers
             var salesRepCode = HttpContext.Session.GetString("SalesRepCode");
             var teamCode = HttpContext.Session.GetString("TeamCode");
 
-
             if (string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(userType))
                 return RedirectToAction("Login", "Account");
 
-            var repCodes = _salesAccessService.GetAccessibleRepCodes(userType, userName, salesRepCode);
+            var repCodes = GetAllowedRepCodes(userName, userType);
+            if (!string.IsNullOrEmpty(salesRepCode) && !repCodes.Contains(salesRepCode))
+                repCodes.Add(salesRepCode);
 
-            bool isAll = repCodes.Count == 1 && repCodes[0] == "__ALL__";
-            if (!isAll && !repCodes.Any())
+            bool isAdmin = userType == "DIRECTOR" && teamCode == "L006";
+
+            if (!isAdmin && !repCodes.Any())
                 return View("TodayDetails", new TodaySalesDetailsViewModel());
 
             // Dev date (replace with DateTime.Today later)
@@ -150,7 +140,6 @@ namespace MIS_DEMO.Controllers
 
             if (p == "select")
             {
-                // If user hasn't selected dates yet, show a default range (example: last 7 days)
                 if (!DateTime.TryParse(from, out var fromDt) || !DateTime.TryParse(to, out var toDt))
                 {
                     startDate = baseToday.AddDays(-6).Date;
@@ -159,7 +148,6 @@ namespace MIS_DEMO.Controllers
                 }
                 else
                 {
-                    // inclusive end-date UX: to=2025-11-20 means include the full day
                     startDate = fromDt.Date;
                     endDateExclusive = toDt.Date.AddDays(1);
                     title = "Custom Range Details";
@@ -208,18 +196,17 @@ namespace MIS_DEMO.Controllers
             IQueryable<SalesFact> salesQuery = _context.VW_SALES_FACT.AsNoTracking()
                     .Where(x => x.RefDate >= startDate && x.RefDate < endDateExclusive && x.LineTotal > 0);
 
-            if (isAll)
-            {
-                // no filter
-            }
-            else if (userType == "DIRECTOR")
-            {
-                var teamCodes = GetDirectorTeamCodes(userName, teamCode);
-                salesQuery = salesQuery.Where(x => x.Pat_Name != null && teamCodes.Contains(x.Pat_Name));
-            }
-            else
+            // RETURNS
+            IQueryable<VwSalesReturnFact> returnQuery = _context.VW_SALES_RETURN_FACT.AsNoTracking()
+                .Where(x => x.RefDate >= startDate && x.RefDate < endDateExclusive && x.LineTotal > 0);
+
+            // ==========================================
+            // NEW UNIFIED SECURITY LOGIC
+            // ==========================================
+            if (!isAdmin)
             {
                 salesQuery = salesQuery.Where(x => repCodes.Contains(x.SalesRepCode));
+                returnQuery = returnQuery.Where(x => repCodes.Contains(x.SalesRepCode));
             }
 
             const int MAX_ROWS = 1000;
@@ -249,26 +236,6 @@ namespace MIS_DEMO.Controllers
                 .OrderByDescending(x => x.LineTotal)
                 .Take(MAX_ROWS)
                 .ToList();
-
-            // RETURNS
-            IQueryable<VwSalesReturnFact> returnQuery = _context.VW_SALES_RETURN_FACT
-                .AsNoTracking()
-                .Where(x => x.RefDate >= startDate && x.RefDate < endDateExclusive && x.LineTotal > 0);
-
-            if (isAll)
-            {
-                // no filter
-            }
-            else if (userType == "DIRECTOR")
-            {
-                var teamCodes = GetDirectorTeamCodes(userName, teamCode);
-                returnQuery = returnQuery.Where(x => x.Pat_Name != null && teamCodes.Contains(x.Pat_Name));
-            }
-            else
-            {
-                returnQuery = returnQuery.Where(x => repCodes.Contains(x.SalesRepCode));
-            }
-
 
             model.ReturnTotal = returnQuery.Sum(x => (decimal?)x.LineTotal) ?? 0;
             model.ReturnTotalRows = returnQuery.Count();
@@ -309,6 +276,7 @@ namespace MIS_DEMO.Controllers
             var userName = HttpContext.Session.GetString("Username");
             var userType = HttpContext.Session.GetString("UserType");
             var salesRepCode = HttpContext.Session.GetString("SalesRepCode");
+            var teamCode = HttpContext.Session.GetString("TeamCode");
 
             ViewBag.TodayIso = _dateProvider.Today.ToString("yyyy-MM-dd");
 
@@ -322,52 +290,44 @@ namespace MIS_DEMO.Controllers
                 return Json(cached);
             }
 
-            var repCodes = _salesAccessService.GetAccessibleRepCodes(userType, userName, salesRepCode);
+            var repCodes = GetAllowedRepCodes(userName, userType);
+            if (!string.IsNullOrEmpty(salesRepCode) && !repCodes.Contains(salesRepCode))
+                repCodes.Add(salesRepCode);
 
-            bool isAll = repCodes.Count == 1 && repCodes[0] == "__ALL__";
+            bool isAdmin = userType == "DIRECTOR" && teamCode == "L006";
 
-            if (!isAll && !repCodes.Any())
+            if (!isAdmin && !repCodes.Any())
                 return Json(new PieChartDataVm());
 
-            // DEV base date (change to DateTime.Today later)
             var baseToday = _dateProvider.Today;
-
             DateTime startDate;
             DateTime endDateExclusive;
 
-            // If "from/to" provided => use range mode
-            bool hasFrom = DateTime.TryParseExact(from, "yyyy-MM-dd", CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out var fromDate);
-
-            bool hasTo = DateTime.TryParseExact(to, "yyyy-MM-dd", CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out var toDate);
+            bool hasFrom = DateTime.TryParseExact(from, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var fromDate);
+            bool hasTo = DateTime.TryParseExact(to, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var toDate);
 
             if (hasFrom && hasTo)
             {
                 startDate = fromDate.Date;
-                endDateExclusive = toDate.Date.AddDays(1); // inclusive end-date UX
+                endDateExclusive = toDate.Date.AddDays(1);
             }
             else
             {
-                // Otherwise use "period"
                 switch ((period ?? "today").ToLower())
                 {
                     case "yesterday":
                         startDate = baseToday.AddDays(-1);
                         endDateExclusive = baseToday;
                         break;
-
                     case "thismonth":
                         startDate = new DateTime(baseToday.Year, baseToday.Month, 1);
                         endDateExclusive = startDate.AddMonths(1);
                         break;
-
                     case "lastmonth":
                         var thisMonthStart = new DateTime(baseToday.Year, baseToday.Month, 1);
                         startDate = thisMonthStart.AddMonths(-1);
                         endDateExclusive = thisMonthStart;
                         break;
-
                     case "today":
                     default:
                         startDate = baseToday;
@@ -375,8 +335,6 @@ namespace MIS_DEMO.Controllers
                         break;
                 }
             }
-
-            var teamCode = HttpContext.Session.GetString("TeamCode");
 
             IQueryable<SalesFact> query = _context.VW_SALES_FACT
                 .AsNoTracking()
@@ -387,20 +345,10 @@ namespace MIS_DEMO.Controllers
                     !string.IsNullOrEmpty(x.ItemDescription)
                 );
 
-            if (isAll)
-            {
-                // no filter
-            }
-            else if (userType == "DIRECTOR")
-            {
-                var teamCodes = GetDirectorTeamCodes(userName, teamCode);
-                query = query.Where(x => x.Pat_Name != null && teamCodes.Contains(x.Pat_Name));
-            }
-            else
+            if (!isAdmin)
             {
                 query = query.Where(x => repCodes.Contains(x.SalesRepCode));
             }
-
 
             var grouped = query
                 .GroupBy(x => x.ItemDescription)
@@ -410,7 +358,6 @@ namespace MIS_DEMO.Controllers
                     Value = metric == "qty"
                             ? (decimal)(g.Sum(x => (decimal?)x.Qty) ?? 0)
                             : Math.Round(g.Sum(x => (decimal?)x.LineTotal) ?? 0, 0)
-
                 })
                 .ToList();
 
@@ -453,30 +400,30 @@ namespace MIS_DEMO.Controllers
             var userName = HttpContext.Session.GetString("Username");
             var userType = HttpContext.Session.GetString("UserType");
             var salesRepCode = HttpContext.Session.GetString("SalesRepCode");
+            var teamCode = HttpContext.Session.GetString("TeamCode");
 
             if (string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(userType))
                 return Unauthorized();
 
-            // DEV base date (replace with DateTime.Today later)
             var today = _dateProvider.Today;
             var yesterday = today.AddDays(-1);
 
-            // We include yesterday + today
-            var start = yesterday;               // 2025-11-19 00:00
-            var endExclusive = today.AddDays(1); // 2025-11-21 00:00
+            var start = yesterday;
+            var endExclusive = today.AddDays(1);
 
-            // business hours
             const int startHour = 8;
-            const int endHour = 19; // inclusive (8..19)
+            const int endHour = 19;
 
             var cacheKey = $"daywise:{userName}:{userType}:{salesRepCode}:{today:yyyyMMdd}:{startHour}-{endHour}";
             if (_cache.TryGetValue(cacheKey, out DayWiseLineChartVm cached))
                 return Json(cached);
 
-            var repCodes = _salesAccessService.GetAccessibleRepCodes(userType, userName, salesRepCode);
-            bool isAll = repCodes.Count == 1 && repCodes[0] == "__ALL__";
+            var repCodes = GetAllowedRepCodes(userName, userType);
+            if (!string.IsNullOrEmpty(salesRepCode) && !repCodes.Contains(salesRepCode))
+                repCodes.Add(salesRepCode);
 
-            // Base query: yesterday + today, business hours only
+            bool isAdmin = userType == "DIRECTOR" && teamCode == "L006";
+
             var q = _context.VW_SALES_FACT
                 .AsNoTracking()
                 .Where(x =>
@@ -487,7 +434,7 @@ namespace MIS_DEMO.Controllers
                     x.SysDateTime.Hour <= endHour
                 );
 
-            if (!isAll)
+            if (!isAdmin)
             {
                 if (!repCodes.Any())
                     return Json(new DayWiseLineChartVm());
@@ -495,7 +442,6 @@ namespace MIS_DEMO.Controllers
                 q = q.Where(x => repCodes.Contains(x.SalesRepCode));
             }
 
-            // Group by day + hour
             var grouped = q
                 .GroupBy(x => new { Day = x.SysDateTime.Date, Hour = x.SysDateTime.Hour })
                 .Select(g => new
@@ -506,13 +452,11 @@ namespace MIS_DEMO.Controllers
                 })
                 .ToList();
 
-            // Convert to dictionary for fast lookup
             var dict = grouped.ToDictionary(
                 x => (Day: x.Day, Hour: x.Hour),
                 x => x.Total
             );
 
-            // Labels: 8 AM -> 7 PM
             var labels = Enumerable.Range(startHour, endHour - startHour + 1)
                 .Select(h => DateTime.Today.Date.AddHours(h).ToString("h tt", CultureInfo.InvariantCulture))
                 .ToList();
@@ -541,21 +485,6 @@ namespace MIS_DEMO.Controllers
             return Json(result);
         }
 
-        private List<string> GetDirectorTeamCodes(string userName, string? sessionTeamCode)
-        {
-            var teamCodes = _context.DIR_TEAM_MAP
-                .AsNoTracking()
-                .Where(x => x.UserNameDir == userName)
-                .Select(x => x.TeamCode)
-                .Distinct()
-                .ToList();
-
-            if (!string.IsNullOrEmpty(sessionTeamCode) && !teamCodes.Contains(sessionTeamCode))
-                teamCodes.Add(sessionTeamCode);
-
-            return teamCodes;
-        }
-
         [HttpGet]
         public IActionResult TeamMonthDetails(string locShort, string mode = "item", string? search = null, int monthOffset = 0)
         {
@@ -567,19 +496,16 @@ namespace MIS_DEMO.Controllers
             if (string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(userType))
                 return RedirectToAction("Login", "Account");
 
-            // -----------------------
-            // Date range: this month
-            // -----------------------
             var today = _dateProvider.Today;
             var referenceDate = today.AddMonths(monthOffset);
             var monthStart = new DateTime(referenceDate.Year, referenceDate.Month, 1);
             var monthEndExclusive = monthStart.AddMonths(1);
 
-            // -----------------------
-            // Access filtering
-            // -----------------------
-            var repCodes = _salesAccessService.GetAccessibleRepCodes(userType, userName, salesRepCode);
-            bool isAll = repCodes.Count == 1 && repCodes[0] == "__ALL__";
+            var repCodes = GetAllowedRepCodes(userName, userType);
+            if (!string.IsNullOrEmpty(salesRepCode) && !repCodes.Contains(salesRepCode))
+                repCodes.Add(salesRepCode);
+
+            bool isAdmin = userType == "DIRECTOR" && teamCode == "L006";
 
             IQueryable<SalesFact> salesQ = _context.VW_SALES_FACT.AsNoTracking()
                 .Where(x => x.RefDate >= monthStart && x.RefDate < monthEndExclusive && x.LineTotal > 0);
@@ -587,32 +513,7 @@ namespace MIS_DEMO.Controllers
             IQueryable<VwSalesReturnFact> retQ = _context.VW_SALES_RETURN_FACT.AsNoTracking()
                 .Where(x => x.RefDate >= monthStart && x.RefDate < monthEndExclusive && x.LineTotal > 0);
 
-            // Role filter (sales + returns)
-            if (isAll)
-            {
-                // L006 / ALL => no role filter
-            }
-            else if (userType == "DIRECTOR")
-            {
-                var teamCodes = GetDirectorTeamCodes(userName, teamCode);
-                if (!teamCodes.Any())
-                {
-                    return View("TeamMonthDetails", new TeamMonthDetailsViewModel
-                    {
-                        LocShort = locShort,
-                        Mode = mode,
-                        Search = search,
-                        Suggestions = new List<string>(),
-                        Columns = new List<string>(),
-                        TableRows = new List<List<string>>()
-                    });
-                }
-
-                // Director is team-based
-                salesQ = salesQ.Where(x => x.Pat_Name != null && teamCodes.Contains(x.Pat_Name));
-                retQ = retQ.Where(x => x.Pat_Name != null && teamCodes.Contains(x.Pat_Name));
-            }
-            else
+            if (!isAdmin)
             {
                 if (!repCodes.Any())
                 {
@@ -631,25 +532,14 @@ namespace MIS_DEMO.Controllers
                 retQ = retQ.Where(x => repCodes.Contains(x.SalesRepCode));
             }
 
-            // -----------------------
-            // Fix the selected Team (LocShort)
-            // -----------------------
             if (!string.IsNullOrWhiteSpace(locShort))
             {
                 salesQ = salesQ.Where(x => x.LocShort == locShort);
                 retQ = retQ.Where(x => x.LocShort == locShort);
             }
 
-            // -----------------------
-            // Search helpers
-            // -----------------------
             string s = (search ?? "").Trim();
             bool HasSearch() => !string.IsNullOrWhiteSpace(s);
-
-            // NOTE: Avoid ToLower on DB columns (better perf)
-            // Most SQL Server collations are case-insensitive anyway.
-            // If yours is case-sensitive, swap to EF.Functions.Like.
-            var sLike = $"%{s}%";
 
             mode = (mode ?? "item").Trim().ToLowerInvariant();
 
@@ -658,8 +548,6 @@ namespace MIS_DEMO.Controllers
             // =====================================================================
             if (mode == "item")
             {
-                // Suggestions should be based on full dataset for this team/month,
-                // NOT narrowed by the current search.
                 var suggestionsQ = salesQ;
 
                 if (HasSearch())
@@ -700,7 +588,6 @@ namespace MIS_DEMO.Controllers
                     rows.Add((x.Item, x.Qty - (r?.Qty ?? 0), x.Amt - (r?.Amt ?? 0)));
                 }
 
-                // include items that appear only in returns (negative net)
                 var salesSet = new HashSet<string>(salesAgg.Select(x => x.Item));
                 foreach (var r in retAgg)
                 {
@@ -735,11 +622,11 @@ namespace MIS_DEMO.Controllers
                     FooterAmount = rows.Sum(x => x.amt),
 
                     TableRows = rows.Select(r => new List<string>
-            {
-                r.item,
-                r.qty.ToString("N0"),
-                r.amt.ToString("N0")
-            }).ToList()
+                    {
+                        r.item,
+                        r.qty.ToString("N0"),
+                        r.amt.ToString("N0")
+                    }).ToList()
                 };
 
                 return View("TeamMonthDetails", vm);
@@ -794,7 +681,6 @@ namespace MIS_DEMO.Controllers
                     rows.Add((x.Rep, x.Item, x.Qty - (r?.Qty ?? 0), x.Amt - (r?.Amt ?? 0)));
                 }
 
-                // rows only in returns (negative net)
                 var salesSet = new HashSet<(string Rep, string Item)>(salesAgg.Select(x => (x.Rep, x.Item)));
                 foreach (var r in retAgg)
                 {
@@ -832,12 +718,12 @@ namespace MIS_DEMO.Controllers
                     FooterAmount = rows.Sum(x => x.amt),
 
                     TableRows = rows.Select(r => new List<string>
-            {
-                r.rep,
-                r.item,
-                r.qty.ToString("N0"),
-                r.amt.ToString("N0")
-            }).ToList()
+                    {
+                        r.rep,
+                        r.item,
+                        r.qty.ToString("N0"),
+                        r.amt.ToString("N0")
+                    }).ToList()
                 };
 
                 return View("TeamMonthDetails", vm);
@@ -846,7 +732,6 @@ namespace MIS_DEMO.Controllers
             // =====================================================================
             // MODE: CUSTOMER  (Customer -> Item -> Rep -> Net Amount)
             // =====================================================================
-            // default to customer if anything else
             {
                 var suggestionsQ = salesQ;
 
@@ -933,20 +818,88 @@ namespace MIS_DEMO.Controllers
                     FooterAmount = rows.Sum(x => x.amt),
 
                     TableRows = rows.Select(r => new List<string>
-            {
-                r.cus,
-                r.item,
-                r.rep,
-                r.qty.ToString("N0"),
-                r.amt.ToString("N0")
-            }).ToList()
+                    {
+                        r.cus,
+                        r.item,
+                        r.rep,
+                        r.qty.ToString("N0"),
+                        r.amt.ToString("N0")
+                    }).ToList()
                 };
 
                 return View("TeamMonthDetails", vm);
             }
         }
 
+        // ==========================================
+        // PRIVATE SECURITY HELPER
+        // ==========================================
+        private List<string> GetAllowedRepCodes(string userName, string userType)
+        {
 
+            var cachedReps = HttpContext.Session.GetString("MyAllowedReps");
+            if (!string.IsNullOrEmpty(cachedReps))
+            {
+                return cachedReps.Split(',').ToList(); // Instantly return from memory!
+            }
+
+            var repCodes = new List<string>();
+
+            if (userType == "REP")
+            {
+                return repCodes;
+            }
+
+            else if (userType == "ASM" || userType == "OTHER")
+            {
+                // First, check if this user is actually an SM by looking them up in the mapping table
+                var assignedASMs = _context.WKF_MAP_SM_ASM
+                    .Where(x => x.UserNameSM == userName)
+                    .Select(x => x.UserNameASM)
+                    .ToList();
+
+                if (assignedASMs.Any())
+                {
+                    // ---> THEY ARE AN SM <---
+                    repCodes = _context.WKF_MAP_REP_ASM_MIS
+                        .Where(x => assignedASMs.Contains(x.UserName) || x.UserName == userName)
+                        .Select(x => x.SalesRepCode)
+                        .Distinct()
+                        .ToList();
+                }
+                else
+                {
+                    // ---> THEY ARE A NORMAL ASM (or OTHER) <---
+                    repCodes = _context.WKF_MAP_REP_ASM_MIS
+                        .Where(x => x.UserName == userName)
+                        .Select(x => x.SalesRepCode)
+                        .Distinct()
+                        .ToList();
+                }
+            }
+
+            else if (userType == "DIRECTOR")
+            {
+                var assignedUserNames = _context.WKF_MAP_ASM_DIR
+                    .Where(x => x.UserNameDir == userName)
+                    .Select(x => x.UserNameAsm)
+                    .ToList();
+
+                repCodes = _context.WKF_MAP_REP_ASM_MIS
+                    .Where(x => assignedUserNames.Contains(x.UserName))
+                    .Select(x => x.SalesRepCode)
+                    .Distinct()
+                    .ToList();
+            }
+
+            // Save the final list to the Session so we never hit the DB again for this user!
+            if (repCodes.Any())
+            {
+                HttpContext.Session.SetString("MyAllowedReps", string.Join(",", repCodes));
+            }
+
+            return repCodes;
+        }
 
     }
 }

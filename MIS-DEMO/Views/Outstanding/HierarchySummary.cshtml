@@ -1,0 +1,195 @@
+﻿@model MIS_DEMO.Models.ViewModels.HierarchySummaryViewModel
+
+@{
+    ViewData["Title"] = "Outstanding Hierarchy";
+}
+
+<div class="d-flex justify-content-between align-items-top mb-3">
+    <div>
+        <h4 class="fw-bold mb-0">Outstanding Summary Breakdown</h4>
+        <small class="text-muted">
+            Team: @Model.Team | @Model.InvoiceType | @Model.PdMode | @Model.RangeDays Days
+        </small>
+    </div>
+    <div class="text-end">
+        <a class="btn btn-sm btn-outline-secondary" href="javascript:history.back()">
+            Back
+        </a>
+    </div>
+</div>
+
+<!-- SEPARATED FILTER & SORT BAR WITH CLEAR BUTTON -->
+<div class="card shadow-sm border-0 mb-3 bg-light">
+    <div class="card-body p-2">
+        <div class="row g-2 align-items-center">
+
+            <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white text-muted"><i class="bi bi-upc-scan"></i></span>
+                    <input type="text" id="filterCode" class="form-control" placeholder="Search Code..." list="codeList" />
+                    <datalist id="codeList">
+                        @foreach (var code in Model.Rows.Select(x => x.RepCode).Distinct().OrderBy(x => x))
+                        {
+                            <option value="@code"></option>
+                        }
+                    </datalist>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white text-muted"><i class="bi bi-person"></i></span>
+                    <input type="text" id="filterName" class="form-control" placeholder="Search Name..." list="nameList" />
+                    <datalist id="nameList">
+                        @foreach (var name in Model.Rows.Select(x => x.RepName).Distinct().OrderBy(x => x))
+                        {
+                            <option value="@name"></option>
+                        }
+                    </datalist>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <select id="sortFilter" class="form-select form-select-sm fw-semibold text-secondary border-secondary-subtle">
+                    <option value="desc">Sort: Gross Outstanding (Highest to Lowest)</option>
+                    <option value="asc">Sort: Gross Outstanding (Lowest to Highest)</option>
+                </select>
+            </div>
+
+            <!-- NEW: CLEAR BUTTON -->
+            <div class="col-md-2">
+                <button type="button" id="btnClear" class="btn btn-sm btn-secondary w-100 fw-bold shadow-sm">
+                    <i class="bi bi-x-circle me-1"></i> Clear
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm table-hover align-middle mb-0" style="font-size: 0.9rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th style="min-width:150px;">CODE</th>
+                        <th style="min-width:250px;">NAME</th>
+                        <th class="text-end" style="min-width:130px;">OUTSTANDING</th>
+                        <th class="text-end" style="min-width:130px;">PD CHEQUE</th>
+                        <th class="text-end" style="min-width:130px;">GROSS OUTS.</th>
+                    </tr>
+                </thead>
+                <tbody id="hierarchyTableBody">
+
+                    <tr class="table-dark fw-bold" style="font-size: 1rem;" id="grandTotalRow">
+                        <td colspan="2">GRAND TOTAL</td>
+                        <td class="text-end">@Model.GrandTotalOut.ToString("N2")</td>
+                        <td class="text-end text-warning">@((Model.GrandTotalPd == 0 ? 0 : Model.GrandTotalPd * -1).ToString("N2"))</td>
+                        <td class="text-end text-info">@Model.GrandTotalGross.ToString("N2")</td>
+                    </tr>
+
+                    @foreach (var row in Model.Rows)
+                    {
+                        <tr class="rep-data-row"
+                            data-code="@row.RepCode.ToLower()"
+                            data-name="@row.RepName.ToLower()"
+                            data-gross="@row.GrossAmt">
+
+                            <td class="fw-bold text-muted">@row.RepCode</td>
+
+                            <td class="fw-bold">
+                                <!-- The link is now wrapped only around the name -->
+                                <a href="@Url.Action("Index", "Outstanding", new { invoiceType = Model.InvoiceType, rangeDays = Model.RangeDays, pdMode = Model.PdMode, team = Model.Team, filterRepCode = row.RepCode })"
+                                   title="Click to view invoices for @row.RepName"
+                                   class="text-decoration-none text-black">
+                                    @row.RepName
+                                </a>
+                            </td>
+
+                            <td class="text-end fw-bold" style="color: #000080;">
+                                @row.OutstandingAmt.ToString("N2")
+                            </td>
+
+                            <td class="text-end fw-bold text-success">
+                                @(row.PdAmt == 0 ? "0.00" : (row.PdAmt * -1).ToString("N2"))
+                            </td>
+
+                            <td class="text-end fw-bold" style="color: #8B0000;">
+                                @row.GrossAmt.ToString("N2")
+                            </td>
+                        </tr>
+                    }
+
+                    @if (!Model.Rows.Any())
+                    {
+                        <tr id="noDataRow">
+                            <td colspan="5" class="text-center py-4 text-muted">No outstanding debt found for your territory.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const codeInput = document.getElementById("filterCode");
+            const nameInput = document.getElementById("filterName");
+            const sortSelect = document.getElementById("sortFilter");
+            const btnClear = document.getElementById("btnClear");
+            const tbody = document.getElementById("hierarchyTableBody");
+
+            const rows = Array.from(document.querySelectorAll(".rep-data-row"));
+
+            function applyFilters() {
+                const termCode = codeInput.value.toLowerCase().trim();
+                const termName = nameInput.value.toLowerCase().trim();
+                const sortOrder = sortSelect.value;
+
+                // 1. Filter: A row must match BOTH inputs (if both have text)
+                let processedRows = rows.filter(row => {
+                    const code = row.getAttribute("data-code");
+                    const name = row.getAttribute("data-name");
+
+                    const matchesCode = code.includes(termCode);
+                    const matchesName = name.includes(termName);
+
+                    return matchesCode && matchesName;
+                });
+
+                // 2. Sort by Gross Outstanding
+                processedRows.sort((a, b) => {
+                    const grossA = parseFloat(a.getAttribute("data-gross"));
+                    const grossB = parseFloat(b.getAttribute("data-gross"));
+
+                    return sortOrder === "desc" ? (grossB - grossA) : (grossA - grossB);
+                });
+
+                // 3. Hide all initially
+                rows.forEach(row => row.style.display = "none");
+
+                // 4. Append filtered & sorted rows
+                processedRows.forEach(row => {
+                    row.style.display = "";
+                    tbody.appendChild(row);
+                });
+            }
+
+            // Clear Button Logic
+            btnClear.addEventListener("click", () => {
+                codeInput.value = "";
+                nameInput.value = "";
+                sortSelect.value = "desc"; // Reset to default sort
+                applyFilters(); // Re-run to show all data
+            });
+
+            // Listen for input changes
+            codeInput.addEventListener("input", applyFilters);
+            nameInput.addEventListener("input", applyFilters);
+            sortSelect.addEventListener("change", applyFilters);
+        });
+    </script>
+}

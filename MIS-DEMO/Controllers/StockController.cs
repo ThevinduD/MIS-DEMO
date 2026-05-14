@@ -99,5 +99,65 @@ namespace MIS_DEMO.Controllers
 
             return View(vm);
         }
+
+        [HttpGet]
+        public IActionResult ItemDetails()
+        {
+            var userName = HttpContext.Session.GetString("Username");
+            var userType = HttpContext.Session.GetString("UserType");
+            var salesRepCode = HttpContext.Session.GetString("SalesRepCode");
+            var teamCode = HttpContext.Session.GetString("TeamCode");
+
+            if (string.IsNullOrEmpty(userName)) return RedirectToAction("Login", "Account");
+
+            // 1. Get Stock and Apply Security Filters
+            var stockQuery = _context.VW_STOCK_TEAM_VALUE.AsNoTracking().Where(x => x.StockQty > 0);
+            stockQuery = ApplyStockRoleFilter(stockQuery, userName, userType, salesRepCode, teamCode);
+
+            // 2. Group by Item, Sum Quantity, and Sort (NO .Take(10) limit!)
+            var allItems = stockQuery
+                .GroupBy(x => new { x.ItemID, x.Description })
+                .Select(g => new TopStockItemRow
+                {
+                    ItemName = g.Key.Description ?? "UNKNOWN ITEM",
+                    TotalQuantity = g.Sum(x => (decimal?)x.StockQty) ?? 0
+                })
+                .OrderByDescending(x => x.TotalQuantity)
+                .ToList();
+
+            // We can reuse your existing Ajax Model, or if you created a specific 
+            // 'AllStockItemsViewModel', you can use that here instead.
+            var vm = new TopStockItemsKpiAjaxModel
+            {
+                TopItems = allItems
+            };
+
+            return View(vm);
+        }
+
+        private IQueryable<StockTeamValue> ApplyStockRoleFilter(IQueryable<StockTeamValue> query, string userName, string userType, string salesRepCode, string teamCode)
+        {
+            if (userType == "REP")
+            {
+                var allowedSupCodes = from ra in _context.WKF_MAP_REP_ASM
+                                      join sa in _context.SUPPLIER_ASM on ra.UserName equals sa.ASMCODE
+                                      where ra.SalesRepCode == salesRepCode
+                                      select sa.SUPCODE;
+                return query.Where(x => allowedSupCodes.Contains(x.SupCode) && x.TeamCode != "L002");
+            }
+            if (userType == "ASM" || userType == "SM" || userType == "OTHER")
+            {
+                var supCodes = _context.SUPPLIER_ASM.Where(x => x.ASMCODE == userName).Select(x => x.SUPCODE);
+                return query.Where(x => supCodes.Contains(x.SupCode) && x.TeamCode != "L002");
+            }
+            if (userType == "DIRECTOR" && teamCode != "L006")
+            {
+                var teamCodes = _context.DIR_TEAM_MAP.Where(x => x.UserNameDir == userName).Select(x => x.TeamCode);
+                return query.Where(x => teamCodes.Contains(x.TeamCode));
+            }
+            return query;
+        }
+
+
     }
 }

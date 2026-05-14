@@ -36,5 +36,23 @@ namespace MIS_DEMO.Data
         public DbSet<SupplierAsm> SUPPLIER_ASM { get; set; }
         public DbSet<DirSupMap> DIR_SUP_MAP { get; set; }
         public DbSet<TargetMonthsRepSpecial> TARGET_MONTHS_REP_SPECIAL { get; set; }
+        public DbSet<CustomerOutstanding> CUSTOMER_OUTSTANDING { get; set; }
+        public DbSet<CustomerPaymentTemp> CUSTOMER_PAYMENT_TEMP { get; set; }
+        public DbSet<Cheque> CHEQUE { get; set; }
+        public DbSet<CustomerPayment> CUSTOMER_PAYMENT { get; set; }
+        public DbSet<Receipt> RECEIPT { get; set; }
+        public DbSet<OutstandingDays> OUTSTANDING_DAYS { get; set; }
+        public DbSet<MisDefaultConfig> MIS_DEFAULT_CONFIG { get; set; }
+        public DbSet<LoginLog> LOGIN_LOGS { get; set; }
+        public DbSet<ReceiptPayInfo> RECEIPT_PAY_INFO { get; set; }
+        public DbSet<PartnerDetails> PartnerDetails { get; set; }
+        public DbSet<MasCreditType> MasCreditType { get; set; }
+        public DbSet<CusCategory> CUS_CATEGORY { get; set; }
+        public DbSet<TargetMain> TARGET_MAIN { get; set; }
+        public DbSet<NonDeliveredDays> NON_DELIVERED_DAYS { get; set; }
+        public DbSet<ITEM_PRICE> ITEM_PRICE { get; set; }
+        public DbSet<AppLink> LINKS { get; set; }
+        public DbSet<WkfMapRepAsmMis> WKF_MAP_REP_ASM_MIS { get; set; }
+        public DbSet<SalesRep> SALES_REP { get; set; }
     }
 }

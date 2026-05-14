@@ -1,0 +1,290 @@
+﻿@model MIS_DEMO.Models.ViewModels.UnrealizedDetailsViewModel
+
+@{
+    ViewData["Title"] = "Unrealized Cheque Details";
+}
+
+<div class="px-md-3 mt-1">
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header text-white d-flex justify-content-between align-items-center py-3" style="background-color: #ec4899;">
+            <div class="d-flex flex-column">
+                <h4 class="mb-0 fw-bold"><i class="bi bi-clock-history"></i>Unrealized Cheques</h4>
+                <small class="text-white-50 mt-1">
+                    [Team: @Model.SelectedTeam] | [Category: @Model.SelectedCategory]
+                </small>
+            </div>
+
+            <a href="javascript:history.back()" class="btn btn-sm bg-white text-dark fw-bold shadow-sm">
+                <i class="bi bi-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3 bg-light">
+        <div class="card-body p-3">
+            <div class="row g-2 align-items-end">
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Invoice No</label>
+                    <input type="text" id="filterInvo" class="form-control form-control-sm shadow-none border-0 rounded-2"
+                           placeholder="Search Invo..." list="invoList" autocomplete="off" />
+                    <datalist id="invoList"></datalist>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Team</label>
+                    <input type="text" id="filterTeam" class="form-control form-control-sm shadow-none border-0 rounded-2"
+                           placeholder="Search Team..." list="teamList" autocomplete="off" />
+                    <datalist id="teamList"></datalist>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Rep Name</label>
+                    <input type="text" id="filterRep" class="form-control form-control-sm shadow-none border-0 rounded-2"
+                           placeholder="Search Rep..." list="repList" autocomplete="off" />
+                    <datalist id="repList"></datalist>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Customer</label>
+                    <input type="text" id="filterCustomer" class="form-control form-control-sm shadow-none border-0 rounded-2"
+                           placeholder="Search Customer..." list="cusList" autocomplete="off" />
+                    <datalist id="cusList"></datalist>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Sort By</label>
+                    <select id="sortSelect" class="form-select form-select-sm shadow-none border-0 rounded-2 text-dark">
+                        <option value="amt-desc" selected>Amount (High to Low)</option>
+                        <option value="amt-asc">Amount (Low to High)</option>
+                        <option value="date-desc">Chq Date (Newest First)</option>
+                        <option value="date-asc">Chq Date (Oldest First)</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="button" id="btnApplyFilters" class="btn btn-sm btn-primary w-100 fw-bold shadow-sm">
+                        <i class="bi bi-search me-1"></i> Apply
+                    </button>
+                    <button type="button" id="btnClearFilters" class="btn btn-sm btn-outline-secondary w-100 fw-bold bg-white shadow-sm">
+                        Clear
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0 table-responsive" style="max-height: 60vh; overflow-y: auto;">
+            <table class="table table-hover table-striped table-sm mb-0 text-nowrap" id="unrealizedTable" style="font-size: 0.85rem;">
+                <thead class="table-secondary sticky-top shadow-sm">
+                    <tr>
+                        <th class="ps-3">Receipt No</th>
+                        <th>Cheque No</th>
+                        <th>Chq Date</th>
+                        <th>Invo No</th>
+                        <th>Team</th>
+                        <th>Rep Name</th>
+                        <th>Customer</th>
+                        <th class="text-end pe-3">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Rows != null && Model.Rows.Any())
+                    {
+                        foreach (var row in Model.Rows)
+                        {
+                            <tr>
+                                <td class="ps-3 fw-bold">
+                                    <a asp-controller="Collection" asp-action="ReceiptDetails" asp-route-receiptNo="@row.ReceiptNo" asp-route-team="@row.Team" class="text-decoration-none text-primary">
+                                        @row.ReceiptNo
+                                    </a>
+                                </td>
+                                <td><span class="text-muted fw-semibold">@row.ChequeNo</span></td>
+                                <td>@(row.PayDate?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                <td class="fw-bold">
+                                    <a asp-controller="Collection" asp-action="InvoiceDetails" asp-route-invoNo="@row.InvoNo" class="text-decoration-none text-info">
+                                        @row.InvoNo
+                                    </a>
+                                </td>
+                                <td>@row.Team</td>
+                                <td class="text-truncate" style="max-width: 150px;" title="@row.RepName">@row.RepName</td>
+                                <td class="text-truncate" style="max-width: 200px;" title="@row.Customer">@row.Customer</td>
+                                <td class="text-end fw-bold text-danger pe-3">@row.Amount.ToString("N0")</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">
+                                <h5>No Unrealized Cheques Found!</h5>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                @if (Model.Rows != null && Model.Rows.Any())
+                {
+                    <tfoot class="table-light sticky-bottom shadow-sm">
+                        <tr>
+                            <td colspan="7" class="text-end fw-bold text-dark fs-6 py-2">TOTAL UNREALIZED:</td>
+                            <td id="totalUnrealized" class="text-end fw-bold text-danger fs-6 py-2 pe-3">@Model.TotalAmount.ToString("N0")</td>
+                        </tr>
+                    </tfoot>
+                }
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="filterLoadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center" style="background: rgba(255,255,255,0.6); z-index: 1055;">
+    <div class="text-center">
+        <div class="spinner-border text-primary mb-2" role="status"></div>
+        <div class="fw-semibold small text-muted">Processing filters…</div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const invoInput = document.getElementById("filterInvo");
+        const teamInput = document.getElementById("filterTeam");
+        const repInput  = document.getElementById("filterRep");
+        const cusInput  = document.getElementById("filterCustomer");
+        const sortSelect = document.getElementById("sortSelect"); // NEW: Sort Input
+
+        const btnApply = document.getElementById("btnApplyFilters");
+        const btnClear = document.getElementById("btnClearFilters");
+        const loadingOverlay = document.getElementById("filterLoadingOverlay");
+        const SPINNER_DELAY_MS = 30;
+
+        function showLoading() { loadingOverlay?.classList.remove("d-none"); }
+        function hideLoading() { loadingOverlay?.classList.add("d-none"); }
+
+        // Columns based on table: 2=Date, 3=Invo, 4=Team, 5=Rep, 6=Cus, 7=Amt
+        const cols = { date: 2, invo: 3, team: 4, rep: 5, cus: 6, amt: 7 };
+
+        function buildRowCache() {
+            const table = document.getElementById("unrealizedTable");
+            if (!table) return [];
+            return Array.from(table.querySelectorAll("tbody tr"))
+                .filter(r => r.cells && r.cells.length > cols.amt)
+                .map(r => {
+                    const invoRaw = (r.cells[cols.invo].innerText || "").trim();
+                    const teamRaw = (r.cells[cols.team].innerText || "").trim();
+                    const repRaw  = (r.cells[cols.rep].innerText  || "").trim();
+                    const cusRaw  = (r.cells[cols.cus].innerText  || "").trim();
+                    const amt = parseFloat((r.cells[cols.amt].innerText || "").replace(/[^-0-9.]/g, "")) || 0;
+
+                    // Parse Date for sorting (if "-" treat as 0)
+                    const dateText = (r.cells[cols.date].innerText || "").trim();
+                    const dateValue = dateText === "-" ? 0 : new Date(dateText).getTime();
+
+                    return {
+                        row: r,
+                        invoRaw, teamRaw, repRaw, cusRaw,
+                        invo: invoRaw.toLowerCase(), team: teamRaw.toLowerCase(), rep: repRaw.toLowerCase(), cus: cusRaw.toLowerCase(),
+                        amt,
+                        dateValue
+                    };
+                });
+        }
+
+        const dataCache = buildRowCache();
+
+        function fillDatalistFromCache(getter, datalistId) {
+            const dl = document.getElementById(datalistId);
+            if (!dl) return;
+            const set = new Set();
+            for (const x of dataCache) {
+                const v = getter(x);
+                if (v) set.add(v);
+            }
+            dl.innerHTML = "";
+            Array.from(set).forEach(v => {
+                const opt = document.createElement("option");
+                opt.value = v;
+                dl.appendChild(opt);
+            });
+        }
+
+        function buildAllDatalists() {
+            fillDatalistFromCache(x => x.invoRaw, "invoList");
+            fillDatalistFromCache(x => x.teamRaw, "teamList");
+            fillDatalistFromCache(x => x.repRaw,  "repList");
+            fillDatalistFromCache(x => x.cusRaw,  "cusList");
+        }
+
+        function filterEverything() {
+            const invoF = (invoInput.value || "").toLowerCase();
+            const teamF = (teamInput.value || "").toLowerCase();
+            const repF  = (repInput.value  || "").toLowerCase();
+            const cusF  = (cusInput.value  || "").toLowerCase();
+
+            let runningTotal = 0;
+
+            for (const x of dataCache) {
+                const ok = x.invo.includes(invoF) && x.team.includes(teamF) && x.rep.includes(repF) && x.cus.includes(cusF);
+                x.row.style.display = ok ? "" : "none";
+                if (ok) runningTotal += x.amt;
+            }
+
+            const totalElement = document.getElementById("totalUnrealized");
+            if(totalElement) {
+                totalElement.innerText = runningTotal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            }
+        }
+
+        function sortEverything() {
+            const sortVal = sortSelect.value;
+
+            // Sort the JS array based on selected value
+            dataCache.sort((a, b) => {
+                if (sortVal === "amt-desc")  return b.amt - a.amt;
+                if (sortVal === "amt-asc")   return a.amt - b.amt;
+                if (sortVal === "date-desc") return b.dateValue - a.dateValue;
+                if (sortVal === "date-asc")  return a.dateValue - b.dateValue;
+                return 0;
+            });
+
+            // Re-append the rows to the tbody in the new sorted order
+            const tbody = document.querySelector("#unrealizedTable tbody");
+            if (tbody) {
+                dataCache.forEach(x => tbody.appendChild(x.row));
+            }
+        }
+
+        function clearFilters() {
+            if(invoInput) invoInput.value = "";
+            if(teamInput) teamInput.value = "";
+            if(repInput) repInput.value = "";
+            if(cusInput) cusInput.value = "";
+            if(sortSelect) sortSelect.value = "amt-desc"; // Reset Sort
+
+            filterEverything();
+            sortEverything();
+        }
+
+        function applyWithSpinner() {
+            showLoading();
+            setTimeout(() => {
+                filterEverything();
+                sortEverything();
+                hideLoading();
+            }, SPINNER_DELAY_MS);
+        }
+
+        if(btnApply) btnApply.addEventListener("click", applyWithSpinner);
+        if(btnClear) btnClear.addEventListener("click", () => { clearFilters(); });
+
+        // Auto-sort when the user changes the dropdown
+        if(sortSelect) sortSelect.addEventListener("change", applyWithSpinner);
+
+        [invoInput, teamInput, repInput, cusInput].forEach(i => {
+            if(i) i.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); applyWithSpinner(); } });
+        });
+
+        buildAllDatalists();
+    });
+</script>

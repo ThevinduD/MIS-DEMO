@@ -1,0 +1,189 @@
+﻿@model MIS_DEMO.Models.ViewModels.OutstandingDetailsViewModel
+
+@{
+    ViewData["Title"] = "Outstanding Invoices Details";
+}
+
+<div class="d-flex justify-content-between align-items-top mb-3">
+    <div>
+        <h4 class="fw-bold mb-0">Customer Outstanding Details</h4>
+        <small class="text-muted">
+            Team: @Model.SelectedTeam | @Model.InvoiceType | @Model.PdMode | @Model.RangeDays Days
+        </small>
+    </div>
+    <div class="text-end">
+        <a class="btn btn-sm btn-outline-secondary" href="javascript:history.back()">
+            Back
+        </a>
+    </div>
+</div>
+
+<div class="card mb-3 shadow-sm border-0" style="background-color: #f8fafc;">
+    <div class="card-body py-2 text-center">
+        <span class="text-muted fw-bold me-2">Total Outstanding Debt:</span>
+        <span class="fs-4 fw-bold text-danger" id="kpiTotalOut">@Model.TotalOutstanding.ToString("N2")</span>
+    </div>
+</div>
+
+<div class="card mb-3 shadow-sm border-0">
+    <div class="card-body p-2">
+        <div class="row g-2">
+            <div class="col-md-2">
+                <input type="text" id="filterInv" class="form-control form-control-sm" placeholder="Search Invoice..." list="invList" />
+                <datalist id="invList"></datalist>
+            </div>
+            <div class="col-md-2">
+                <input type="text" id="filterTeam" class="form-control form-control-sm" placeholder="Search Team..." list="teamList" />
+                <datalist id="teamList"></datalist>
+            </div>
+            <div class="col-md-2">
+                <input type="text" id="filterRep" class="form-control form-control-sm" placeholder="Search Rep Name..." list="repList" />
+                <datalist id="repList"></datalist>
+            </div>
+            <div class="col-md-2">
+                <input type="text" id="filterCus" class="form-control form-control-sm" placeholder="Search Cus Name..." list="cusList" />
+                <datalist id="cusList"></datalist>
+            </div>
+            
+            <div class="col-md-2">
+                <button type="button" class="btn btn-sm btn-primary w-100" id="btnApplyFilters">Apply</button>
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-sm btn-secondary w-100" id="btnClearFilters">Clear</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0 table-sm" id="outTable">
+                <thead class="table-light">
+                    <tr>
+                        <th style="min-width:100px;">Invoice No</th>
+                        <th style="min-width:100px;">Invoice Date</th>
+                        <th style="min-width:100px;">Delivery Date</th>
+                        <th style="min-width:60px;">Team</th>
+                        <th style="min-width:170px;">RepName</th>
+                        <th style="min-width:300px;">Customer</th>
+                        <th style="min-width:110px;" class="text-end">Invoice Amt</th>
+                        <th style="min-width:110px;" class="text-end text-danger">Balance Amt</th>
+                        <th style="min-width:60px;" class="text-center">Aging</th>
+                        
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Rows.Count == 0)
+                    {
+                        <tr><td colspan="9" class="text-center py-4 text-muted">No outstanding invoices found for these filters.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var r in Model.Rows)
+                        {
+                            <tr>
+                                <td class="font-monospace">
+                                    <a asp-action="InvoiceDetails" asp-controller="Outstanding" asp-route-invoiceNo="@r.DocNo" class="text-decoration-none fw-bold text-primary">
+                                        @r.DocNo
+                                    </a>
+                                </td>
+                                <td>@(r.RefDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                <td>@(r.FDeliveryDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                <td>@r.Team</td>
+                                <td>@r.RepName</td>
+                                <td>@r.CusName</td>
+                                <td class="text-end">@r.InvoiceAmt.ToString("N2")</td>
+                                <td class="text-end fw-bold text-danger">@r.BalanceAmt.ToString("N2")</td>
+                                <td class="text-center fw-bold">@r.AgeDays</td>
+                                
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const fTeam = document.getElementById("filterTeam");
+            const fRep = document.getElementById("filterRep");
+            const fCus = document.getElementById("filterCus");
+            const fInv = document.getElementById("filterInv");
+
+            const btnApply = document.getElementById("btnApplyFilters");
+            const btnClear = document.getElementById("btnClearFilters");
+            const table = document.getElementById("outTable");
+
+            if (!table) return;
+
+            const rows = Array.from(table.querySelector("tbody").querySelectorAll("tr"));
+
+            // --- CORRECTED COLUMN INDEXES ---
+            const colInv = 0;   // Invoice No
+            const colTeam = 3;  // Team
+            const colRep = 4;   // Rep Name
+            const colCus = 5;   // Customer
+            const colBal = 7;   // Balance Amt
+
+            // Ensure we only process rows that actually have all 9 columns
+            const cache = rows.filter(r => r.cells.length >= 9).map(r => ({
+                row: r,
+                inv: r.cells[colInv].innerText.trim(),
+                team: r.cells[colTeam].innerText.trim(),
+                rep: r.cells[colRep].innerText.trim(),
+                cus: r.cells[colCus].innerText.trim(),
+                bal: parseFloat(r.cells[colBal].innerText.replace(/,/g, '')) || 0
+            }));
+
+            function fillDatalist(getter, datalistId) {
+                const dl = document.getElementById(datalistId);
+                if (!dl) return;
+                const set = new Set();
+                cache.forEach(x => { const v = getter(x); if (v) set.add(v); });
+                dl.innerHTML = "";
+                Array.from(set).sort().forEach(v => dl.appendChild(new Option(v)));
+            }
+
+            // Populate the dropdown suggestions correctly
+            fillDatalist(x => x.inv, "invList");
+            fillDatalist(x => x.team, "teamList");
+            fillDatalist(x => x.rep, "repList");
+            fillDatalist(x => x.cus, "cusList");
+
+            function filterTable() {
+                const vt = fTeam.value.toLowerCase();
+                const vr = fRep.value.toLowerCase();
+                const vc = fCus.value.toLowerCase();
+                const vi = fInv.value.toLowerCase();
+                let sumBal = 0;
+
+                cache.forEach(x => {
+                    const match = x.team.toLowerCase().includes(vt) &&
+                                  x.rep.toLowerCase().includes(vr) &&
+                                  x.cus.toLowerCase().includes(vc) &&
+                                  x.inv.toLowerCase().includes(vi);
+
+                    x.row.style.display = match ? "" : "none";
+                    if (match) sumBal += x.bal;
+                });
+
+                document.getElementById("kpiTotalOut").innerText = sumBal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            btnApply.addEventListener("click", filterTable);
+
+            btnClear.addEventListener("click", () => {
+                fTeam.value = fRep.value = fCus.value = fInv.value = "";
+                filterTable();
+            });
+
+            [fTeam, fRep, fCus, fInv].forEach(input => {
+                input.addEventListener("keydown", (e) => { if (e.key === "Enter") filterTable(); });
+            });
+        });
+    </script>
+}

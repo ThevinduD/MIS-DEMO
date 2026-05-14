@@ -1,0 +1,355 @@
+﻿@model MIS_DEMO.Models.ViewModels.NetOutstandingDetailsViewModel
+
+@{
+    ViewData["Title"] = "Net Outstanding Details";
+}
+
+<div class="px-md-3 mt-1">
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header text-white d-flex justify-content-between align-items-center py-3" style="background-color: #dc2626;">
+            <div class="d-flex flex-column">
+                <h4 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle"></i> Net Outstanding Invoices</h4>
+                <small class="text-white-50 mt-1">
+                    Team: @Model.SelectedTeam | Category: @Model.SelectedCategory | Mode: @Model.OutstandingMode
+                </small>
+            </div>
+
+            <a href="javascript:history.back()" class="btn btn-sm bg-white text-danger fw-bold shadow-sm">
+                <i class="bi bi-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3 bg-light">
+        <div class="card-body p-3">
+            <div class="row g-2 align-items-end">
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Invoice No</label>
+                    <input type="text" id="filterInvo" class="form-control form-control-sm shadow-none border-0 rounded-2"
+                           placeholder="Search Invo..." list="invoList" autocomplete="off" />
+                    <datalist id="invoList"></datalist>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Team</label>
+                    <input type="text" id="filterTeam" class="form-control form-control-sm shadow-none border-0 rounded-2"
+                           placeholder="Search Team..." list="teamList" autocomplete="off" />
+                    <datalist id="teamList"></datalist>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Rep Name</label>
+                    <input type="text" id="filterRep" class="form-control form-control-sm shadow-none border-0 rounded-2"
+                           placeholder="Search Rep..." list="repList" autocomplete="off" />
+                    <datalist id="repList"></datalist>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Customer</label>
+                    <input type="text" id="filterCustomer" class="form-control form-control-sm shadow-none border-0 rounded-2"
+                           placeholder="Search Customer..." list="cusList" autocomplete="off" />
+                    <datalist id="cusList"></datalist>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Sort By</label>
+                    <select id="sortSelect" class="form-select form-select-sm shadow-none border-0 rounded-2 text-dark">
+                        <option value="age-desc" selected>Aging (Oldest First)</option>
+                        <option value="age-asc">Aging (Newest First)</option>
+                        <option value="bal-desc">Balance (High to Low)</option>
+                        <option value="bal-asc">Balance (Low to High)</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="button" id="btnApplyFilters" class="btn btn-sm btn-primary w-100 fw-bold shadow-sm">
+                        <i class="bi bi-search me-1"></i> Apply
+                    </button>
+                    <button type="button" id="btnClearFilters" class="btn btn-sm btn-outline-secondary w-100 fw-bold bg-white shadow-sm">
+                        Clear
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0 table-responsive" style="max-height: 60vh; overflow-y: auto;">
+            <table class="table table-hover table-striped table-sm mb-0 text-nowrap" id="netOutTable" style="font-size: 0.85rem;">
+                <thead class="table-secondary sticky-top shadow-sm">
+                    <tr>
+                        <th class="ps-3">Invo No</th>
+                        <th>Inv Date</th>
+                        <th>Del. Date</th>
+                        <th class="text-center">Credit Period</th>
+                        <th>Team</th>
+                        <th>Rep Name</th>
+                        <th>Customer</th>
+                        <th class="text-end">Inv Amount</th>
+                        <th class="text-end">Balance</th>
+                        <th>Due Date</th>
+                        <th class="text-center pe-3">Aging</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Rows != null && Model.Rows.Any())
+                    {
+                        foreach (var row in Model.Rows)
+                        {
+                            <tr>
+                                <td class="ps-3 fw-bold text-primary">
+                                    <a asp-controller="Collection"
+                                       asp-action="InvoiceDetails"
+                                       asp-route-invoNo="@row.InvoNo"
+                                       class="text-decoration-none text-primary">
+                                        @row.InvoNo
+                                    </a>
+                                </td>
+                                <td>@(row.InvDate?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                <td>@(row.DelDate?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                <td class="text-center">@row.CreditPeriod</td>
+                                <td>@row.Team</td>
+                                <td class="text-truncate" style="max-width: 150px;" title="@row.RepName">@row.RepName</td>
+                                <td class="text-truncate" style="max-width: 200px;" title="@row.Customer">@row.Customer</td>
+                                <td class="text-end">@row.InvAmount.ToString("N0")</td>
+                                <td class="text-end fw-bold text-danger">@row.Balance.ToString("N0")</td>
+                                <td class="fw-semibold">@(row.DueDate?.ToString("dd-MMM-yyyy") ?? "-")</td>
+                                <td class="text-center pe-3">@row.Aging days</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="11" class="text-center text-muted py-4">
+                                <h5>No Net Outstanding Invoices Found!</h5>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                @* @if (Model.Rows != null && Model.Rows.Any())
+                {
+                    <tfoot class="table-light sticky-bottom shadow-sm">
+                        <tr>
+                            <td colspan="8" class="text-end fw-bold text-dark fs-6 py-2">TOTAL NET OUTSTANDING:</td>
+                            <td id="totalNetOut" class="text-end fw-bold text-danger fs-6 py-2">@Model.TotalNetOut.ToString("N0")</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                } *@
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="filterLoadingOverlay"
+     class="position-fixed top-0 start-0 w-100 h-100 d-none align-items-center justify-content-center"
+     style="background: rgba(255,255,255,0.6); z-index: 1055;">
+    <div class="text-center">
+        <div class="spinner-border text-primary mb-2" role="status"></div>
+        <div class="fw-semibold small text-muted">Processing filters…</div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Inputs
+        const invoInput = document.getElementById("filterInvo");
+        const teamInput = document.getElementById("filterTeam");
+        const repInput  = document.getElementById("filterRep");
+        const cusInput  = document.getElementById("filterCustomer");
+        const sortSelect = document.getElementById("sortSelect"); // NEW: Sort Input
+
+        // Buttons
+        const btnApply = document.getElementById("btnApplyFilters");
+        const btnClear = document.getElementById("btnClearFilters");
+
+        // Overlay
+        const loadingOverlay = document.getElementById("filterLoadingOverlay");
+        const SPINNER_DELAY_MS = 30;
+
+        function showLoading() { loadingOverlay?.classList.remove("d-none"); }
+        function hideLoading() { loadingOverlay?.classList.add("d-none"); }
+
+        // Table column indexes based on the HTML above (Added age: 10)
+        const cols = { invo: 0, team: 4, rep: 5, cus: 6, bal: 8, age: 10 };
+
+        // Cache rows once (raw for datalist, lower for filtering)
+        function buildRowCache(tableId, c) {
+            const table = document.getElementById(tableId);
+            if (!table) return [];
+
+            const rows = Array.from(table.querySelectorAll("tbody tr"));
+
+            // Keep only real data rows
+            return rows
+                .filter(r => r.cells && r.cells.length > c.age)
+                .map(r => {
+                    const invoRaw = (r.cells[c.invo].innerText || "").trim();
+                    const teamRaw = (r.cells[c.team].innerText || "").trim();
+                    const repRaw  = (r.cells[c.rep].innerText  || "").trim();
+                    const cusRaw  = (r.cells[c.cus].innerText  || "").trim();
+
+                    // Extract Balance
+                    const bal = parseFloat((r.cells[c.bal].innerText || "").replace(/[^-0-9.]/g, "")) || 0;
+
+                    // NEW: Extract Aging (Strip out the word "days" to get pure number)
+                    const ageRaw = (r.cells[c.age].innerText || "").replace(/[^-0-9]/g, "");
+                    const age = parseInt(ageRaw) || 0;
+
+                    return {
+                        row: r,
+                        invoRaw, teamRaw, repRaw, cusRaw,
+                        invo: invoRaw.toLowerCase(),
+                        team: teamRaw.toLowerCase(),
+                        rep:  repRaw.toLowerCase(),
+                        cus:  cusRaw.toLowerCase(),
+                        bal,
+                        age
+                    };
+                });
+        }
+
+        const netOutCache = buildRowCache("netOutTable", cols);
+
+        // Build datalists
+        function fillDatalistFromCache(cache, getter, datalistId, limit = 400) {
+            const dl = document.getElementById(datalistId);
+            if (!dl) return;
+
+            const set = new Set();
+            for (const x of cache) {
+                const v = (getter(x) || "").trim();
+                if (v) set.add(v);
+                if (set.size >= limit) break;
+            }
+
+            dl.innerHTML = "";
+            Array.from(set).slice(0, limit).forEach(v => {
+                const opt = document.createElement("option");
+                opt.value = v;
+                dl.appendChild(opt);
+            });
+        }
+
+        function buildAllDatalists() {
+            fillDatalistFromCache(netOutCache, x => x.invoRaw, "invoList");
+            fillDatalistFromCache(netOutCache, x => x.teamRaw, "teamList");
+            fillDatalistFromCache(netOutCache, x => x.repRaw,  "repList");
+            fillDatalistFromCache(netOutCache, x => x.cusRaw,  "cusList");
+        }
+
+        // Apply filters & update Total Balance
+        function filterEverything() {
+            const invoF = (invoInput.value || "").toLowerCase();
+            const teamF = (teamInput.value || "").toLowerCase();
+            const repF  = (repInput.value  || "").toLowerCase();
+            const cusF  = (cusInput.value  || "").toLowerCase();
+
+            let runningBal = 0;
+
+            for (const x of netOutCache) {
+                const ok =
+                    x.invo.includes(invoF) &&
+                    x.team.includes(teamF) &&
+                    x.rep.includes(repF) &&
+                    x.cus.includes(cusF);
+
+                x.row.style.display = ok ? "" : "none";
+
+                if (ok) {
+                    runningBal += x.bal;
+                }
+            }
+
+            const totalElement = document.getElementById("totalNetOut");
+            if(totalElement) {
+                totalElement.innerText = runningBal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            }
+        }
+
+        // NEW: Sort the rows in the DOM
+        function sortEverything() {
+            const sortVal = sortSelect.value;
+
+            // Sort the JS array based on selected value
+            netOutCache.sort((a, b) => {
+                if (sortVal === "bal-desc") return b.bal - a.bal;
+                if (sortVal === "bal-asc")  return a.bal - b.bal;
+                if (sortVal === "age-desc") return b.age - a.age;
+                if (sortVal === "age-asc")  return a.age - b.age;
+                return 0;
+            });
+
+            // Re-append the rows to the tbody in the new sorted order
+            const tbody = document.querySelector("#netOutTable tbody");
+            if (tbody) {
+                netOutCache.forEach(x => tbody.appendChild(x.row));
+            }
+        }
+
+        function clearFilters() {
+            ["filterInvo", "filterTeam", "filterRep", "filterCustomer"].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = "";
+            });
+            // Reset sort to default
+            if(sortSelect) sortSelect.value = "age-desc";
+
+            filterEverything();
+            sortEverything();
+        }
+
+        function applyWithSpinner() {
+            showLoading();
+            if(btnApply) btnApply.disabled = true;
+            if(btnClear) btnClear.disabled = true;
+
+            setTimeout(() => {
+                filterEverything();
+                sortEverything(); // Trigger sort alongside filter
+                hideLoading();
+                if(btnApply) btnApply.disabled = false;
+                if(btnClear) btnClear.disabled = false;
+            }, SPINNER_DELAY_MS);
+        }
+
+        function clearWithSpinner() {
+            showLoading();
+            if(btnApply) btnApply.disabled = true;
+            if(btnClear) btnClear.disabled = true;
+
+            setTimeout(() => {
+                clearFilters();
+                hideLoading();
+                if(btnApply) btnApply.disabled = false;
+                if(btnClear) btnClear.disabled = false;
+            }, SPINNER_DELAY_MS);
+        }
+
+        // Wire buttons and dropdowns
+        if(btnApply) btnApply.addEventListener("click", applyWithSpinner);
+        if(btnClear) btnClear.addEventListener("click", clearWithSpinner);
+
+        // Auto-sort when the user changes the dropdown
+        if(sortSelect) sortSelect.addEventListener("change", applyWithSpinner);
+
+        // Enter in any input = Apply
+        [invoInput, teamInput, repInput, cusInput].forEach(i => {
+            if(i) {
+                i.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        applyWithSpinner();
+                    }
+                });
+            }
+        });
+
+        // Initialize lists
+        buildAllDatalists();
+    });
+</script>

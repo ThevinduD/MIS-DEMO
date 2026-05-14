@@ -1,0 +1,71 @@
+﻿@model MIS_DEMO.Models.ViewModels.InvoiceDetailsViewModel
+
+@{
+    ViewData["Title"] = "Invoice Details - " + Model.InvoNo;
+}
+
+<div class="px-md-3 mt-4">
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header text-white d-flex justify-content-between align-items-center py-3" style="background-color: #2563eb;">
+            <div class="d-flex flex-column">
+                <h4 class="mb-0 fw-bold"><i class="bi bi-receipt"></i> Invoice Details: @Model.InvoNo</h4>
+                <small class="text-white-50 mt-1">
+                    Customer: @Model.CustomerName | Rep: @Model.RepName | Team: @Model.Team | Date: @(Model.RefDate?.ToString("dd-MMM-yyyy") ?? "-")
+                </small>
+            </div>
+
+            <a href="javascript:history.back()" class="btn btn-sm bg-white text-primary fw-bold shadow-sm">
+                <i class="bi bi-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0 table-responsive" style="max-height: 70vh; overflow-y: auto;">
+            <table class="table table-hover table-striped table-sm mb-0 text-nowrap" style="font-size: 0.85rem;">
+                <thead class="table-secondary sticky-top shadow-sm">
+                    <tr>
+                        <th class="ps-3">Item Code</th>
+                        <th>Description</th>
+                        <th class="text-end">Qty</th>
+                        <th class="text-end">Unit Price</th>
+                        <th class="text-end pe-3">Line Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Lines != null && Model.Lines.Any())
+                    {
+                        foreach (var item in Model.Lines)
+                        {
+                            <tr>
+                                <td class="ps-3 fw-bold text-muted">@item.ItemCode</td>
+                                <td class="text-truncate" style="max-width: 300px;" title="@item.Description">@item.Description</td>
+                                <td class="text-end fw-semibold">@item.Qty.ToString("N0")</td>
+                                <td class="text-end">@item.UnitPrice.ToString("N2")</td>
+                                <td class="text-end pe-3 fw-bold text-primary">@item.LineTotal.ToString("N2")</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                <h5>No Items Found!</h5>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                @if (Model.Lines != null && Model.Lines.Any())
+                {
+                    <tfoot class="table-light sticky-bottom shadow-sm">
+                        <tr>
+                            <td colspan="4" class="text-end fw-bold text-dark fs-6 py-2">INVOICE TOTAL:</td>
+                            <td class="text-end fw-bold text-danger fs-6 py-2 pe-3">@Model.TotalAmount.ToString("N2")</td>
+                        </tr>
+                    </tfoot>
+                }
+            </table>
+        </div>
+    </div>
+</div>

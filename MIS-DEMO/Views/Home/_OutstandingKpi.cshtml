@@ -1,0 +1,103 @@
+﻿@model MIS_DEMO.Models.ViewModels.OutstandingKpiViewModel
+
+<div class="card shadow-sm border-0 h-100" style="background-color: #94a3b8;">
+
+    <div class="card-header bg-transparent border-0 pt-3 pb-0 px-3 d-flex flex-row justify-content-between">
+        <div>
+            <div class="fw-bold fs-5 text-dark" style="line-height: 1;">Customer Outstanding</div>
+            <small class="text-muted fw-semibold">Outstanding KPI</small>
+        </div>
+        <div>
+                <a href="javascript:void(0);"
+                   onclick="goToOutstandingDetails()"
+                   class="btn btn-sm rounded-2 bg-white shadow-sm"
+                   style="font-size: 1.1rem; font-weight: 700; text-decoration:none;">
+                    View
+                </a>
+        </div>
+    </div>
+
+    <div class="card-body px-3 py-3 border-bottom">
+        <div class="row g-2">
+            <div class="col-12">
+                <select class="form-select form-select-sm border-secondary-subtle shadow-none fw-semibold text-secondary"
+                        onchange="reloadOutstandingKpi()" id="outTeam">
+                    <option value="All" selected="@(Model.SelectedTeam == "All")">Team: All Teams</option>
+                    @foreach (var team in Model.AvailableTeams)
+                    {
+                        <option value="@team" selected="@(Model.SelectedTeam == team)">Team: @team</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-12">
+                <select class="form-select form-select-sm border-secondary-subtle shadow-none fw-semibold text-secondary"
+                        onchange="reloadOutstandingKpi()" id="outInvoiceType">
+                    <option value="Delivered" selected="@(Model.InvoiceType == "Delivered")">Type: Delivered</option>
+                    <option value="Non Delivered" selected="@(Model.InvoiceType == "Non Delivered")">Type: Non Delivered</option>
+                    <option value="All" selected="@(Model.InvoiceType == "All")">Type: All Invoices</option>
+                </select>
+            </div>
+
+            <div class="col-6">
+                <select class="form-select form-select-sm border-secondary-subtle shadow-none fw-semibold text-secondary"
+                        onchange="reloadOutstandingKpi()" id="outRangeDays">
+
+                    @foreach (var days in Model.AvailableDays)
+                    {
+                        <option value="@days" selected="@(Model.RangeDays == days)">Range: @days Days</option>
+                    }
+
+                </select>
+            </div>
+
+            <div class="col-6">
+                <select class="form-select form-select-sm border-secondary-subtle shadow-none fw-semibold text-secondary"
+                        onchange="reloadOutstandingKpi()" id="outPdMode">
+                    <option value="Without PD" selected="@(Model.PdMode == "Without PD")">Without PD</option>
+                    <option value="With PD" selected="@(Model.PdMode == "With PD")">With PD</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body px-3 pt-3 pb-3 d-flex flex-column justify-content-center">
+
+        <!-- BELOW DAYS SECTION -->
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-end mb-1">
+                <span class="text-muted fw-bold" style="font-size: 0.85rem; text-transform: uppercase;">
+                    Below @Model.RangeDays Days
+                </span>
+                <!-- CHANGED TO CLICKABLE LINK -->
+                <a href="@Url.Action("Index", "Outstanding", new { invoiceType = Model.InvoiceType, rangeDays = Model.RangeDays, pdMode = Model.PdMode, team = Model.SelectedTeam, ageBracket = "Below" })"
+                   class="badge bg-primary bg-opacity-10 text-black border border-black border-opacity-25 px-2 py-1 text-decoration-none"
+                   style="cursor: pointer;">
+                    @Model.BelowCount Invoices
+                </a>
+            </div>
+            <div class="fw-bold text-dark" style="font-size: 1.6rem; line-height: 1;">
+                @Model.BelowAmount.ToString("N2")
+            </div>
+        </div>
+
+        <!-- ABOVE DAYS SECTION -->
+        <div>
+            <div class="d-flex justify-content-between align-items-end mb-1">
+                <span class="text-muted fw-bold" style="font-size: 0.85rem; text-transform: uppercase;">
+                    Above @Model.RangeDays Days
+                </span>
+                <!-- CHANGED TO CLICKABLE LINK -->
+                <a href="@Url.Action("Index", "Outstanding", new { invoiceType = Model.InvoiceType, rangeDays = Model.RangeDays, pdMode = Model.PdMode, team = Model.SelectedTeam, ageBracket = "Above" })"
+                   class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-1 text-decoration-none"
+                   style="cursor: pointer;">
+                    @Model.AboveCount Invoices
+                </a>
+            </div>
+            <div class="fw-bold text-dark" style="font-size: 1.6rem; line-height: 1;">
+                @Model.AboveAmount.ToString("N2")
+            </div>
+        </div>
+
+    </div>
+</div>

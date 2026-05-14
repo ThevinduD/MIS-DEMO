@@ -1,0 +1,45 @@
+﻿@model MIS_DEMO.Models.ViewModels.TopStockItemsKpiAjaxModel
+
+<div class="card shadow-sm bg-pink h-100">
+    <div class="card-body">
+
+        <!-- UPDATED HEADER WITH VIEW BUTTON -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="fw-bold fs-5 text-dark m-0" style="line-height: 1;">
+                Items Stock Value
+            </div>
+            <a asp-action="ItemDetails" asp-controller="Stock"
+               class="btn btn-sm rounded-2 bg-white shadow-sm"
+               style="font-size: 0.9rem; font-weight: 700; text-decoration:none; color: #333;">
+                View
+            </a>
+        </div>
+
+        <table class="table table-borderless table-sm mb-0 mx-auto text-dark" style="max-width: 100%;">
+            <tbody>
+                <tr>
+                    <td class="fw-bold text-start pb-2 border-bottom border-danger" style="width:70%;">Item Name</td>
+                    <td class="fw-bold text-end pb-2 border-bottom border-danger" style="width:30%;">Quantity</td>
+                </tr>
+                @foreach (var item in Model.TopItems)
+                {
+                    <tr>
+                        <td class="text-start text-truncate" style="max-width: 180px;" title="@item.ItemName">
+                            <small class="fw-semibold">@item.ItemName</small>
+                        </td>
+                        <td class="fw-bold text-end">
+                            @item.TotalQuantity.ToString("N0")
+                        </td>
+                    </tr>
+                }
+                @if (!Model.TopItems.Any())
+                {
+                    <tr>
+                        <td colspan="2" class="text-center text-muted py-3">No stock available</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+    </div>
+</div>

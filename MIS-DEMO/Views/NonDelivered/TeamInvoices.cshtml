@@ -23,11 +23,7 @@
     </div>
 
     <div class="text-end">
-        <a class="btn btn-sm btn-outline-secondary"
-           asp-controller="NonDelivered"
-           asp-action="Invoices">
-            Back
-        </a>
+        <a class="btn btn-sm btn-outline-secondary mt-1" href="javascript:history.back()">Back</a>
     </div>
 </div>
 
@@ -137,7 +133,7 @@
                             var repDisplay = string.IsNullOrWhiteSpace(r.SalesRepName) ? r.SalesRepCode : r.SalesRepName;
 
                             <tr>
-                                <td>@r.RefDate.ToString("yyyy-MM-dd")</td>
+                                <td>@(r.RefDate?.ToString("yyyy-MM-dd") ?? "-")</td>
                                 <td class="fw-semibold">@r.InvoDocNo</td>
                                 <td>@cusDisplay</td>
                                 <td>@repDisplay</td>

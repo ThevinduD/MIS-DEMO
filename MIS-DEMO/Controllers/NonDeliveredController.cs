@@ -10,16 +10,13 @@ namespace MIS_DEMO.Controllers
     public class NonDeliveredController : Controller
     {
         private readonly AppDbContext _context;
-        private readonly SalesAccessService _salesAccessService;
         private readonly IDateProvider _dateProvider;
 
         public NonDeliveredController(
             AppDbContext context,
-            SalesAccessService salesAccessService,
             IDateProvider dateProvider)
         {
             _context = context;
-            _salesAccessService = salesAccessService;
             _dateProvider = dateProvider;
         }
 
@@ -46,27 +43,25 @@ namespace MIS_DEMO.Controllers
                     x.Cancel == false
                 );
 
-            // Access control (reuse service)
-            var repCodes = _salesAccessService.GetAccessibleRepCodes(userType, userName, salesRepCode);
-            bool isAll = repCodes.Count == 1 && repCodes[0] == "__ALL__";
-
-            if (!isAll && userType == "DIRECTOR")
+            // ==========================================
+            // NEW UNIFIED SECURITY LOGIC
+            // ==========================================
+            if (userType == "DIRECTOR" && teamCode == "L006")
             {
-                var teamCodes = GetDirectorTeamCodes(userName, teamCode);
-                if (!teamCodes.Any())
-                    return View(new NonDeliveredInvoicesViewModel { CutoffDate = cutoff45 });
-
-                // Director access by team code (Pat_Name)
-                q = q.Where(x => x.Pat_Name != null && teamCodes.Contains(x.Pat_Name));
+                // Admin L006 sees everything - No filter applied
             }
-            else if (!isAll)
+            else
             {
-                // REP / ASM / SM access by rep codes
-                if (repCodes == null || repCodes.Count == 0)
+                var repCodes = GetAllowedRepCodes(userName, userType);
+                if (!string.IsNullOrEmpty(salesRepCode) && !repCodes.Contains(salesRepCode))
+                    repCodes.Add(salesRepCode);
+
+                if (!repCodes.Any())
                     return View(new NonDeliveredInvoicesViewModel { CutoffDate = cutoff45 });
 
                 q = q.Where(x => repCodes.Contains(x.SalesRepCode));
             }
+            // ==========================================
 
             // Join TEAM_MIS to convert Pat_Name(LocCode) -> LocShort
             var qWithTeam =
@@ -141,21 +136,6 @@ namespace MIS_DEMO.Controllers
             return View(model);
         }
 
-        private List<string> GetDirectorTeamCodes(string userName, string? sessionTeamCode)
-        {
-            var teamCodes = _context.DIR_TEAM_MAP
-                .AsNoTracking()
-                .Where(x => x.UserNameDir == userName)
-                .Select(x => x.TeamCode)
-                .Distinct()
-                .ToList();
-
-            if (!string.IsNullOrEmpty(sessionTeamCode) && !teamCodes.Contains(sessionTeamCode))
-                teamCodes.Add(sessionTeamCode);
-
-            return teamCodes;
-        }
-
         [HttpGet]
         public IActionResult TeamInvoices(string team, string bucket, string? invoice, string? rep, string? customer)
         {
@@ -191,28 +171,20 @@ namespace MIS_DEMO.Controllers
                     x.Cancel == false
                 );
 
-            // -----------------------------
-            // Access control (reuse service)
-            // -----------------------------
-            var repCodes = _salesAccessService.GetAccessibleRepCodes(userType, userName, salesRepCode);
-            bool isAll = repCodes.Count == 1 && repCodes[0] == "__ALL__";
-
-            if (!isAll && userType == "DIRECTOR")
+            // ==========================================
+            // NEW UNIFIED SECURITY LOGIC
+            // ==========================================
+            if (userType == "DIRECTOR" && teamCode == "L006")
             {
-                var teamCodes = GetDirectorTeamCodes(userName, teamCode);
-                if (!teamCodes.Any())
-                    return View("TeamInvoices", new TeamInvoicesViewModel
-                    {
-                        Team = team,
-                        Bucket = bucket,
-                        CutoffDate = cutoff45
-                    });
-
-                q = q.Where(x => x.Pat_Name != null && teamCodes.Contains(x.Pat_Name));
+                // Admin L006 sees everything - No filter applied
             }
-            else if (!isAll)
+            else
             {
-                if (repCodes == null || repCodes.Count == 0)
+                var repCodes = GetAllowedRepCodes(userName, userType);
+                if (!string.IsNullOrEmpty(salesRepCode) && !repCodes.Contains(salesRepCode))
+                    repCodes.Add(salesRepCode);
+
+                if (!repCodes.Any())
                     return View("TeamInvoices", new TeamInvoicesViewModel
                     {
                         Team = team,
@@ -222,6 +194,7 @@ namespace MIS_DEMO.Controllers
 
                 q = q.Where(x => repCodes.Contains(x.SalesRepCode));
             }
+            // ==========================================
 
             // -----------------------------
             // SALES header lookup (1 row per invoice) for CusName + SalesRepName
@@ -306,7 +279,6 @@ namespace MIS_DEMO.Controllers
             // -----------------------------
             const int MAX_ROWS = 1000;
 
-            // IMPORTANT: Count before Take if you want "truncated" label
             int totalRows = baseQ.Count();
 
             var rows = baseQ
@@ -350,6 +322,76 @@ namespace MIS_DEMO.Controllers
                 : $"More than 45 days (≤{cutoff45:yyyy-MM-dd})";
 
             return View("TeamInvoices", vm);
+        }
+
+        // ==========================================
+        // PRIVATE SECURITY HELPER
+        // ==========================================
+        private List<string> GetAllowedRepCodes(string userName, string userType)
+        {
+
+            var cachedReps = HttpContext.Session.GetString("MyAllowedReps");
+            if (!string.IsNullOrEmpty(cachedReps))
+            {
+                return cachedReps.Split(',').ToList(); // Instantly return from memory!
+            }
+
+            var repCodes = new List<string>();
+
+            if (userType == "REP")
+            {
+                return repCodes;
+            }
+
+            else if (userType == "ASM" || userType == "OTHER")
+            {
+                // First, check if this user is actually an SM by looking them up in the mapping table
+                var assignedASMs = _context.WKF_MAP_SM_ASM
+                    .Where(x => x.UserNameSM == userName)
+                    .Select(x => x.UserNameASM)
+                    .ToList();
+
+                if (assignedASMs.Any())
+                {
+                    // ---> THEY ARE AN SM <---
+                    repCodes = _context.WKF_MAP_REP_ASM_MIS
+                        .Where(x => assignedASMs.Contains(x.UserName) || x.UserName == userName)
+                        .Select(x => x.SalesRepCode)
+                        .Distinct()
+                        .ToList();
+                }
+                else
+                {
+                    // ---> THEY ARE A NORMAL ASM (or OTHER) <---
+                    repCodes = _context.WKF_MAP_REP_ASM_MIS
+                        .Where(x => x.UserName == userName)
+                        .Select(x => x.SalesRepCode)
+                        .Distinct()
+                        .ToList();
+                }
+            }
+
+            else if (userType == "DIRECTOR")
+            {
+                var assignedUserNames = _context.WKF_MAP_ASM_DIR
+                    .Where(x => x.UserNameDir == userName)
+                    .Select(x => x.UserNameAsm)
+                    .ToList();
+
+                repCodes = _context.WKF_MAP_REP_ASM_MIS
+                    .Where(x => assignedUserNames.Contains(x.UserName))
+                    .Select(x => x.SalesRepCode)
+                    .Distinct()
+                    .ToList();
+            }
+
+            // Save the final list to the Session so we never hit the DB again for this user!
+            if (repCodes.Any())
+            {
+                HttpContext.Session.SetString("MyAllowedReps", string.Join(",", repCodes));
+            }
+
+            return repCodes;
         }
     }
 }

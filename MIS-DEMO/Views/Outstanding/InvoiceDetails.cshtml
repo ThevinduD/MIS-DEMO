@@ -1,0 +1,244 @@
+﻿@model MIS_DEMO.Models.ViewModels.InvoiceDetailViewModel
+
+@{
+    ViewData["Title"] = "Invoice Details - " + Model.InvoiceNo;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="fw-bold mb-0">Invoice: @Model.InvoiceNo</h4>
+        <small class="text-muted">Date: @(Model.InvoiceDate?.ToString("yyyy-MM-dd") ?? "N/A") | Team: @Model.Team</small>
+    </div>
+    <div>
+        <button class="btn btn-sm btn-outline-secondary shadow-sm" onclick="history.back()">Back</button>
+    </div>
+</div>
+
+<div class="row mb-3 g-2">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100" style="background-color: #f8fafc;">
+            <div class="card-body py-2">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Customer</small>
+                <div class="fw-semibold text-dark">@Model.CusName</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100" style="background-color: #f8fafc;">
+            <div class="card-body py-2">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.75rem;">Sales Rep</small>
+                <div class="fw-semibold text-dark">@Model.RepName</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3 g-2 text-center">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body py-3">
+                <div class="text-muted fw-bold mb-1" style="font-size: 0.85rem;">Invoice Amount</div>
+                <div class="fs-4 fw-bold text-dark">@Model.InvoiceAmount.ToString("N2")</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100" style="background-color: #ffeef0;">
+            <div class="card-body py-3">
+                <div class="text-muted fw-bold mb-1" style="font-size: 0.85rem;">Balance Amount</div>
+                <div class="fs-4 fw-bold text-danger" style="line-height: 1;">@Model.BalanceAmount.ToString("N2")</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white border-bottom pt-3 pb-2">
+        <h6 class="fw-bold mb-0 text-success">Item Details</h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0 table-sm">
+                <thead class="table-light">
+                    <tr>
+                        <th style="min-width: 120px;">Item Code</th>
+                        <th style="min-width: 150px;">Description</th>
+                        <th class="text-end" style="min-width: 80px;">Qty</th>
+                        <th class="text-end" style="min-width: 100px;">Unit Price</th>
+                        <th class="text-end" style="min-width: 120px;">Line Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Items.Count == 0)
+                    {
+                        <tr><td colspan="5" class="text-center py-4 text-muted">No items found for this invoice.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var item in Model.Items)
+                        {
+                            <tr>
+                                <td class="font-monospace text-muted">@item.ItemCode</td>
+                                <td class="fw-semibold">@item.ItemName</td>
+                                <td class="text-end">@item.Qty.ToString("N2")</td>
+                                <td class="text-end">@item.UnitPrice.ToString("N2")</td>
+                                <td class="text-end fw-bold">@item.Amount.ToString("N2")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@if (Model.ReturnedItems.Any())
+{
+    <div class="card shadow-sm border-0 mt-3">
+        <div class="card-header bg-white border-bottom pt-3 pb-2">
+            <h6 class="fw-bold mb-0 text-danger">Returned Items</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle mb-0 table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width: 120px;">Item Code</th>
+                            <th style="min-width: 250px;">Description</th>
+                            <th class="text-end" style="min-width: 80px;">Return Qty</th>
+                            <th class="text-end" style="min-width: 100px;">Return Price</th>
+                            <th class="text-end" style="min-width: 120px;">Return Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.ReturnedItems)
+                        {
+                            <tr>
+                                <td class="font-monospace text-muted">@item.ItemCode</td>
+                                <td class="fw-semibold">@item.ItemName</td>
+                                <td class="text-end">@item.Qty.ToString("N2")</td>
+                                <td class="text-end">@item.UnitPrice.ToString("N2")</td>
+                                <td class="text-end fw-bold text-danger">@item.Amount.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+
+@if (Model.Payments.Any())
+{
+    <div class="card shadow-sm border-0 mt-3">
+        <div class="card-header bg-white border-bottom pt-3 pb-2">
+            <h6 class="fw-bold mb-0 text-success">Payment Details</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle mb-0 table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width: 120px;">Receipt No</th>
+                            <th style="min-width: 100px;">Date</th>
+                            <th style="min-width: 200px;">Payment Type</th>
+                            <th style="min-width: 120px;">Reference No</th>
+                            <th class="text-end" style="min-width: 120px;">Receipt Amount</th>
+                            <th class="text-end" style="min-width: 120px;">Set Off Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Model.Payments)
+                        {
+                            <tr>
+                                <td class="font-monospace fw-semibold text-dark">@p.ReceiptNo</td>
+                                <td class="text-muted">@(p.PayDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                <td>@p.Type</td>
+                                <td class="font-monospace text-muted">@p.RefNo</td>
+                                <td class="text-end fw-bold text-secondary">@p.ReceiptAmount.ToString("N2")</td>
+                                <td class="text-end fw-bold text-success">@p.Amount.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+
+@if (Model.Settlements.Any())
+{
+    <div class="card shadow-sm border-0 mt-3">
+        <div class="card-header bg-white border-bottom pt-3 pb-2">
+            <h6 class="fw-bold mb-0 text-primary">Credit Note Settlements</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle mb-0 table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width: 120px;">Settlement No</th>
+                            <th style="min-width: 150px;">Reference No</th>
+                            <th style="min-width: 250px;">Note</th>
+                            <th class="text-end" style="min-width: 120px;">Amount</th>
+                            <th class="text-end" style="min-width: 120px;">Set Off Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model.Settlements)
+                        {
+                            <tr>
+                                <td class="font-monospace fw-semibold text-dark">@s.SettlementNo</td>
+                                <td class="font-monospace text-muted">@s.RefNo</td>
+                                <td><span class="text-muted">@s.Note</span></td>
+                                <td class="text-end fw-bold text-secondary">@s.Amount.ToString("N2")</td>
+                                <td class="text-end fw-bold text-primary">@s.SetOffAmount.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+
+@if (Model.PdCheques.Any())
+{
+    <div class="card shadow-sm border-0 mt-3 border-warning border-start border-4">
+        <div class="card-header bg-white border-bottom pt-3 pb-2">
+            <h6 class="fw-bold mb-0 text-warning" style="color: #d97706 !important;">Pending / PD Cheques</h6>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle mb-0 table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width: 120px;">Receipt No</th>
+                            <th style="min-width: 100px;">Date</th>
+                            <th style="min-width: 200px;">Payment Type</th>
+                            <th style="min-width: 120px;">Reference No</th>
+                            <th class="text-end" style="min-width: 120px;">Receipt Amount</th>
+                            <th class="text-end" style="min-width: 120px;">Set Off Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var pd in Model.PdCheques)
+                        {
+                            <tr>
+                                <td class="font-monospace fw-semibold text-dark">@pd.ReceiptNo</td>
+                                <td class="text-muted">@(pd.PayDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                <td><span class="badge bg-warning text-dark bg-opacity-25 border border-warning-subtle">@pd.Type</span></td>
+                                <td class="font-monospace text-muted">@pd.RefNo</td>
+                                <td class="text-end fw-bold text-secondary">@pd.ReceiptAmount.ToString("N2")</td>
+                                <td class="text-end fw-bold" style="color: #d97706;">@pd.Amount.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

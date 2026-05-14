@@ -3,7 +3,7 @@
     public class TeamInvoicesRowVm
     {
         public string InvoDocNo { get; set; } = "";
-        public DateTime RefDate { get; set; }
+        public DateTime? RefDate { get; set; }
         public decimal Amount { get; set; }
 
         public string CusCode { get; set; } = "";

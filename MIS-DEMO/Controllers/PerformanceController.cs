@@ -131,37 +131,101 @@ namespace MIS_DEMO.Controllers
         // ==========================================
         private IQueryable<T> ApplySalesRoleFilter<T>(IQueryable<T> query, string userName, string userType, string salesRepCode, string teamCode) where T : class
         {
+            // 1. REP (Stays exactly the same)
             if (userType == "REP")
+            {
                 return query.Where(e => EF.Property<string>(e, "SalesRepCode") == salesRepCode);
-
-            if (userType == "DIRECTOR" && teamCode != "L006")
-            {
-                var teamCodes = _context.DIR_TEAM_MAP.Where(x => x.UserNameDir == userName).Select(x => x.TeamCode).ToList();
-                if (!string.IsNullOrEmpty(teamCode) && !teamCodes.Contains(teamCode)) teamCodes.Add(teamCode);
-
-                if (teamCodes.Any()) return query.Where(e => EF.Property<string>(e, "Pat_Name") != null && teamCodes.Contains(EF.Property<string>(e, "Pat_Name")));
-                return query.Where(e => false);
             }
-            if (userType == "ASM" || userType == "OTHER")
+
+            // 2. ADMIN (L006 sees everything)
+            if (userType == "DIRECTOR" && teamCode == "L006")
             {
-                var repCodes = GetAllowedRepCodes(userName);
-                if (!string.IsNullOrEmpty(salesRepCode) && !repCodes.Contains(salesRepCode)) repCodes.Add(salesRepCode);
+                return query;
+            }
+
+            // 3. EVERYONE ELSE (SM, ASM, DIRECTOR Not L006)
+            // They all now use the new GetAllowedRepCodes logic!
+            if (userType == "ASM" || userType == "SM" || userType == "OTHER" || (userType == "DIRECTOR" && teamCode != "L006"))
+            {
+                var repCodes = GetAllowedRepCodes(userName, userType);
+
+                // Include their direct SalesRepCode from session just in case
+                if (!string.IsNullOrEmpty(salesRepCode) && !repCodes.Contains(salesRepCode))
+                {
+                    repCodes.Add(salesRepCode);
+                }
+
                 return query.Where(e => repCodes.Contains(EF.Property<string>(e, "SalesRepCode")));
             }
+
             return query;
         }
 
-        private List<string> GetAllowedRepCodes(string userName)
+        private List<string> GetAllowedRepCodes(string userName, string userType)
         {
-            var isSM = _context.WKF_MAP_SM_ASM.Any(x => x.UserNameSM == userName);
-            if (isSM)
+
+            var cachedReps = HttpContext.Session.GetString("MyAllowedReps");
+            if (!string.IsNullOrEmpty(cachedReps))
             {
-                var assignedASMs = _context.WKF_MAP_SM_ASM.Where(x => x.UserNameSM == userName).Select(x => x.UserNameASM).ToList();
-                var asmRepCodes = _context.WKF_USER_REP_MAP.Where(x => assignedASMs.Contains(x.UserName)).Select(x => x.SalesRepCode).ToList();
-                var repRepCodes = _context.WKF_MAP_REP_ASM.Where(x => assignedASMs.Contains(x.UserName)).Select(x => x.SalesRepCode).ToList();
-                return asmRepCodes.Union(repRepCodes).ToList();
+                return cachedReps.Split(',').ToList(); // Instantly return from memory!
             }
-            return _context.WKF_MAP_REP_ASM.Where(x => x.UserName == userName).Select(x => x.SalesRepCode).ToList();
+
+            var repCodes = new List<string>();
+
+            if (userType == "REP")
+            {
+                return repCodes;
+            }
+
+            else if (userType == "ASM" || userType == "OTHER")
+            {
+                // First, check if this user is actually an SM by looking them up in the mapping table
+                var assignedASMs = _context.WKF_MAP_SM_ASM
+                    .Where(x => x.UserNameSM == userName)
+                    .Select(x => x.UserNameASM)
+                    .ToList();
+
+                if (assignedASMs.Any())
+                {
+                    // ---> THEY ARE AN SM <---
+                    repCodes = _context.WKF_MAP_REP_ASM_MIS
+                        .Where(x => assignedASMs.Contains(x.UserName) || x.UserName == userName)
+                        .Select(x => x.SalesRepCode)
+                        .Distinct()
+                        .ToList();
+                }
+                else
+                {
+                    // ---> THEY ARE A NORMAL ASM (or OTHER) <---
+                    repCodes = _context.WKF_MAP_REP_ASM_MIS
+                        .Where(x => x.UserName == userName)
+                        .Select(x => x.SalesRepCode)
+                        .Distinct()
+                        .ToList();
+                }
+            }
+
+            else if (userType == "DIRECTOR")
+            {
+                var assignedUserNames = _context.WKF_MAP_ASM_DIR
+                    .Where(x => x.UserNameDir == userName)
+                    .Select(x => x.UserNameAsm)
+                    .ToList();
+
+                repCodes = _context.WKF_MAP_REP_ASM_MIS
+                    .Where(x => assignedUserNames.Contains(x.UserName))
+                    .Select(x => x.SalesRepCode)
+                    .Distinct()
+                    .ToList();
+            }
+
+            // Save the final list to the Session so we never hit the DB again for this user!
+            if (repCodes.Any())
+            {
+                HttpContext.Session.SetString("MyAllowedReps", string.Join(",", repCodes));
+            }
+
+            return repCodes;
         }
     }
 }

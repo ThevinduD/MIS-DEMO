@@ -1,0 +1,202 @@
+﻿@model MIS_DEMO.Models.ViewModels.CollectionKpiAjaxModel
+
+<div class="card shadow-sm border-0 h-100 text-white" style="background-color: #1e3a8a;">
+    <div class="card-body p-3">
+
+        <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="d-flex flex-column">
+                <h5 class="card-title m-0">Daily Collections</h5>
+                <h6 class="card-subtitle text-white-50 mt-1">Collection KPI</h6>
+            </div>
+            <a asp-controller="Collection" asp-action="Details"
+               class="btn btn-sm rounded-2 bg-white shadow-sm fw-bold"
+               style="color: #1e3a8a;"
+               onclick="passCollectionFilters(event)">
+                View
+            </a>
+        </div>
+
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <input type="date" class="form-control form-control-sm shadow-none border-0 fw-semibold text-dark rounded-3 w-100"
+                       id="colDate"
+                       value="@Model.SelectedDate.ToString("yyyy-MM-dd")"
+                       onchange="reloadCollectionKpi()">
+            </div>
+
+            <div class="col-3">
+                <select class="form-select form-select-sm shadow-none border-0 fw-semibold text-dark rounded-3 w-100 px-1"
+                        id="colTeam"
+                        onchange="reloadCollectionKpi()">
+                    <option value="All" selected="@(Model.SelectedTeam == "All")">All</option>
+                    @foreach (var t in Model.AvailableTeams)
+                    {
+                        <option value="@t" selected="@(Model.SelectedTeam == t)">@t</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-3">
+                <select class="form-select form-select-sm shadow-none border-0 fw-semibold text-dark rounded-3 w-100 px-1"
+                        id="colCategory"
+                        onchange="reloadCollectionKpi()">
+                    <option value="All" selected="@(Model.SelectedCategory == "All")">All</option>
+                    @foreach (var c in Model.AvailableCategories)
+                    {
+                        <option value="@c" selected="@(Model.SelectedCategory == c)">@c</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="mb-2" style="font-size: 0.85rem;">
+
+            <div class="row g-0 border-bottom border-light border-opacity-25 text-white-50 pb-1 mb-2">
+                <div class="fw-normal" style="width: 20%;">Type</div>
+                <div class="text-end fw-normal" style="width: 24%;">Today</div>
+                <div class="text-end fw-normal" style="width: 28%;">This Mo</div>
+                <div class="text-end fw-normal" style="width: 28%;">Last Mo</div>
+            </div>
+
+            <div class="row g-0 mb-1 align-items-center">
+                <div class="text-nowrap" style="width: 20%;">D.D</div>
+                <div class="text-end fw-bold" style="width: 24%;">@Model.DirectCash.Today.ToString("N0")</div>
+                <div class="text-end fw-bold" style="width: 28%;">@Model.DirectCash.ThisMonth.ToString("N0")</div>
+                <div class="text-end text-white-50" style="width: 28%;">@Model.DirectCash.LastMonth.ToString("N0")</div>
+            </div>
+
+            <div class="row g-0 mb-1 align-items-center">
+                <div class="text-nowrap" style="width: 20%;">P.D.C</div>
+                <div class="text-end fw-bold" style="width: 24%;">@Model.ChequeCollected.Today.ToString("N0")</div>
+                <div class="text-end fw-bold" style="width: 28%;">@Model.ChequeCollected.ThisMonth.ToString("N0")</div>
+                <div class="text-end text-white-50" style="width: 28%;">@Model.ChequeCollected.LastMonth.ToString("N0")</div>
+            </div>
+
+            <div class="row g-0 align-items-center text-warning">
+                <div class="text-nowrap" style="width: 20%;">C.D</div>
+                <div class="text-end fw-bold" style="width: 24%;">@Model.ChequeDeposited.Today.ToString("N0")</div>
+                <div class="text-end fw-bold" style="width: 28%;">@Model.ChequeDeposited.ThisMonth.ToString("N0")</div>
+                <div class="text-end text-white-50" style="width: 28%;">@Model.ChequeDeposited.LastMonth.ToString("N0")</div>
+            </div>
+
+            <div class="row g-0 mt-2 pt-2 border-top border-light border-opacity-25 align-items-center text-info">
+                <div class="text-nowrap fw-bold" style="width: 20%;">Net C</div>
+                <div class="text-end fw-bold" style="width: 24%;">@Model.RealizedCollection.Today.ToString("N0")</div>
+                <div class="text-end fw-bold" style="width: 28%;">@Model.RealizedCollection.ThisMonth.ToString("N0")</div>
+                <div class="text-end text-white-50" style="width: 28%;">@Model.RealizedCollection.LastMonth.ToString("N0")</div>
+            </div>
+
+            <div class="row g-0 mt-1 align-items-center" style="color: #4ade80;">
+                <div class="text-nowrap fw-bold" style="width: 20%;">Gross C</div>
+                <div class="text-end fw-bold" style="width: 24%;">@Model.GrossCollection.Today.ToString("N0")</div>
+                <div class="text-end fw-bold" style="width: 28%;">@Model.GrossCollection.ThisMonth.ToString("N0")</div>
+                <div class="text-end text-white-50" style="width: 28%;">@Model.GrossCollection.LastMonth.ToString("N0")</div>
+            </div>
+
+            <div class="row g-0 mb-1 align-items-center" style="color: #fb923c;">
+                <div class="text-nowrap" style="width: 20%;">Rtn Chq</div>
+                <div class="text-end fw-bold" style="width: 24%;">@Model.ReturnCheques.Today.ToString("N0")</div>
+                <div class="text-end fw-bold" style="width: 28%;">@Model.ReturnCheques.ThisMonth.ToString("N0")</div>
+                <div class="text-end text-white-50" style="width: 28%;">@Model.ReturnCheques.LastMonth.ToString("N0")</div>
+            </div>
+
+            <div class="row g-0 align-items-center" style="color: #a78bfa;">
+                <div class="text-nowrap" style="width: 20%;">CR Note</div>
+                <div class="text-end fw-bold" style="width: 24%;">@Model.CreditNotes.Today.ToString("N0")</div>
+                <div class="text-end fw-bold" style="width: 28%;">@Model.CreditNotes.ThisMonth.ToString("N0")</div>
+                <div class="text-end text-white-50" style="width: 28%;">@Model.CreditNotes.LastMonth.ToString("N0")</div>
+            </div>
+
+        </div>
+        <hr class="border-light my-2 opacity-25" />
+
+        <div class="mt-3 pt-2 border-top border-light border-opacity-25">
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                <h6 class="text-white-50 m-0 text-nowrap" style="font-size: 0.7rem; letter-spacing: 1px;">OUTSTANDING TO @Model.OutstandingTargetDate.ToString("dd-MMM-yyyy").ToUpper()</h6>
+
+                <div class="d-flex gap-2 flex-grow-1 justify-content-end">
+                    <select class="form-select shadow-none border-0 fw-semibold text-dark rounded-3 px-2 py-1" style="font-size: 0.75rem; width: auto; background-position: right 0.25rem center; padding-right: 1.5rem;"
+                            id="outMode"
+                            onchange="reloadCollectionKpi()">
+                        <option value="All" selected="@(Model.OutstandingMode == "All")">All</option>
+                        <option value="Delivered" selected="@(Model.OutstandingMode == "Delivered")">Delivered</option>
+                    </select>
+
+                    <select class="form-select shadow-none border-0 fw-semibold text-dark rounded-3 px-2 py-1" style="font-size: 0.75rem; width: auto; background-position: right 0.25rem center; padding-right: 1.5rem;"
+                            id="freezeMode"
+                            onchange="reloadCollectionKpi()">
+                        <option value="NonFreeze" selected="@(Model.FreezeMode == "NonFreeze")">Non-Freeze</option>
+                        <option value="Freeze(month)" selected="@(Model.FreezeMode == "Freeze(month)")">Freeze(Month)</option>
+                        <option value="Freeze(week)" selected="@(Model.FreezeMode == "Freeze(week)")">Freeze(Week)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between text-center">
+
+                <a asp-controller="Collection"
+                   asp-action="NetOutstandingDetails"
+                   asp-route-team="@Model.SelectedTeam"
+                   asp-route-filterDate="@Model.SelectedDate.ToString("yyyy-MM-dd")"
+                   asp-route-outMode="@Model.OutstandingMode"
+                   asp-route-freezeMode="@Model.FreezeMode"
+                   asp-route-category="@Model.SelectedCategory"
+                   class="pe-1 border-end border-light border-opacity-25 text-decoration-underline text-white d-block"
+                   style="width: 28%; cursor: pointer;">
+
+                    <div class="text-white-50 text-truncate" style="font-size: 0.65rem; text-transform: uppercase;">Net Out</div>
+                    <div class="fw-bold text-white" style="font-size: 0.85rem;">@((Model.NetOutstanding / 1000000m).ToString("N2"))M</div>
+
+                </a>
+
+                <div class="px-1 border-end border-light border-opacity-25" style="width: 28%;">
+                    <div class="text-white-50 text-truncate" style="font-size: 0.65rem; text-transform: uppercase;">Realized</div>
+                    <div class="fw-bold" style="font-size: 0.85rem; color: #4ade80;">@((Model.SystemMonthRealized / 1000000m).ToString("N2"))M</div>
+                </div>
+
+                <div class="px-1 border-end border-light border-opacity-25" style="width: 28%;">
+                    <div class="text-white-50 text-truncate" style="font-size: 0.65rem; text-transform: uppercase;">To Be Collect</div>
+                    <div class="fw-bold text-warning" style="font-size: 0.85rem;">@((Model.ToBeNetCollect / 1000000m).ToString("N2"))M</div>
+                </div>
+
+                <div class="ps-1" style="width: 16%;">
+                    <div class="text-white-50 text-truncate" style="font-size: 0.65rem; text-transform: uppercase;">Rate</div>
+                    <div class="fw-bold text-info" style="font-size: 0.85rem;">@Model.RunRate.ToString("N0")%</div>
+                </div>
+
+            </div>
+
+            <div class="d-flex justify-content-between text-center mt-2 pt-2 border-top border-light border-opacity-25">
+
+                <a asp-controller="Collection"
+                   asp-action="UnrealizedDetails"
+                   asp-route-team="@Model.SelectedTeam"
+                   asp-route-category="@Model.SelectedCategory"
+                   class="pe-1 border-end border-light border-opacity-25 text-white d-block text-decoration-underline"
+                   style="width: 33%; cursor: pointer;"
+                   onmouseover="this.style.textDecoration='underline'"
+                   onmouseout="this.style.textDecoration='none'">
+
+                    <div class="text-truncate text-white-50" style="font-size: 0.65rem; text-transform: uppercase;">Unrealized Total</div>
+                    <div class="fw-bold" style="font-size: 0.85rem; color: #fbcfe8;">@((Model.UnrealizedTotal / 1000000m).ToString("N2"))M</div>
+
+                </a>
+
+                <div class="px-1 border-end border-light border-opacity-25" style="width: 33%;">
+                    <div class="text-white-50 text-truncate" style="font-size: 0.65rem; text-transform: uppercase;">To Be Gross As at date</div>
+                    <div class="fw-bold text-white" style="font-size: 0.85rem;">@((Model.ToBeGrossOnDate / 1000000m).ToString("N2"))M</div>
+                </div>
+
+                <div class="ps-1" style="width: 33%;">
+                    <div class="text-white-50 text-truncate" style="font-size: 0.65rem; text-transform: uppercase;">Gross Rate</div>
+                    <div class="fw-bold text-info" style="font-size: 0.85rem;">@Model.GrossRate.ToString("N0")%</div>
+                </div>
+
+            </div>
+
+            
+        </div>
+
+    </div>
+</div>

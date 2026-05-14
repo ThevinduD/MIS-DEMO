@@ -1,0 +1,109 @@
+﻿@model MIS_DEMO.Models.ViewModels.SalesKpiAjaxModel
+
+<div class="card text-white bg-primary border-0 h-100 shadow-sm">
+    <div class="card-body p-3">
+
+        <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="d-flex flex-column">
+                <h5 class="card-title m-0 fw-bold">Sales & Returns</h5>
+                <h6 class="card-subtitle text-white-50 mt-1">Sales KPI</h6>
+            </div>
+            <a asp-controller="Sales" asp-action="Details"
+               class="btn btn-sm rounded-2 bg-white text-primary shadow-sm fw-bold"
+               onclick="passSalesFilters(event)">
+                View
+            </a>
+        </div>
+
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <input type="date" class="form-control form-control-sm shadow-none border-0 fw-semibold rounded-3 w-100"
+                       id="salesDate"
+                       value="@Model.SelectedDate.ToString("yyyy-MM-dd")"
+                       onchange="reloadSalesKpi()">
+            </div>
+
+            <div class="col-3">
+                <select class="form-select form-select-sm shadow-none border-0 fw-semibold rounded-3 w-100 px-1"
+                        id="salesTeam"
+                        onchange="reloadSalesKpi()">
+                    <option value="All" selected="@(Model.SelectedTeam == "All")">All</option>
+                    @foreach (var t in Model.AvailableTeams)
+                    {
+                        <option value="@t" selected="@(Model.SelectedTeam == t)">@t</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-3">
+                <select class="form-select form-select-sm shadow-none border-0 fw-semibold rounded-3 w-100 px-1"
+                        id="salesCategory"
+                        onchange="reloadSalesKpi()">
+                    <option value="All" selected="@(Model.SelectedCategory == "All")">All</option>
+                    @foreach (var c in Model.AvailableCategories)
+                    {
+                        <option value="@c" selected="@(Model.SelectedCategory == c)">@c</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="mb-2" style="font-size: 0.85rem;">
+
+            <div class="row g-0 border-bottom border-light border-opacity-25 text-white pb-1 mb-2">
+                <div class="fw-normal" style="width: 20%;">Type</div>
+                <div class="text-end fw-normal" style="width: 24%;">Today</div>
+                <div class="text-end fw-normal" style="width: 28%;">This Mo</div>
+                <div class="text-end fw-normal" style="width: 28%;">Last Mo</div>
+            </div>
+
+            <div class="row g-0 mb-1 align-items-center">
+                <div class="text-nowrap fw-semibold" style="width: 20%;">Sales</div>
+                <div class="text-end fw-semibold" style="width: 24%;">@Model.Sales.Today.ToString("N0")</div>
+                <div class="text-end fw-semibold" style="width: 28%;">@Model.Sales.ThisMonth.ToString("N0")</div>
+                <div class="text-end text-white-75" style="width: 28%;">@Model.Sales.LastMonth.ToString("N0")</div>
+            </div>
+
+            <div class="row g-0 mb-2 align-items-center" style="color: #fda4af;">
+                <div class="text-nowrap fw-semibold" style="width: 20%;">Returns</div>
+                <div class="text-end fw-semibold" style="width: 24%;">@Model.Returns.Today.ToString("N0")</div>
+                <div class="text-end fw-semibold" style="width: 28%;">@Model.Returns.ThisMonth.ToString("N0")</div>
+                <div class="text-end text-white-75" style="width: 28%;">@Model.Returns.LastMonth.ToString("N0")</div>
+            </div>
+
+            <div class="row g-0 pt-2 border-top border-light border-opacity-25 align-items-center text-warning">
+                <div class="text-nowrap fw-semibold" style="width: 20%;">Net Sales</div>
+                <div class="text-end fw-semibold" style="width: 24%;">@Model.NetSales.Today.ToString("N0")</div>
+                <div class="text-end fw-semibold" style="width: 28%;">@Model.NetSales.ThisMonth.ToString("N0")</div>
+                <div class="text-end text-white-75" style="width: 28%;">@Model.NetSales.LastMonth.ToString("N0")</div>
+            </div>
+
+        </div>
+        <hr class="border-light my-2 opacity-25" />
+
+        <div class="mt-3 pt-2 border-top border-light border-opacity-25">
+
+            <div class="row g-0 border-bottom border-light border-opacity-25 text-white pb-1 mb-2" style="font-size: 0.75rem;">
+                <div class="fw-normal text-start" style="width: 26%;"></div>
+                <div class="fw-normal text-end" style="width: 28%;">Target</div>
+                <div class="fw-normal text-end" style="width: 30%;">Achievement</div>
+                <div class="fw-normal text-end" style="width: 16%;">Rate</div>
+            </div>
+
+            <div class="row g-0 mb-1 align-items-center" style="font-size: 0.85rem;">
+                <div class="text-nowrap text-start" style="width: 26%; font-size: 0.7rem; text-transform: uppercase;">This Month</div>
+                <div class="fw-semibold text-white text-end" style="width: 30%;">@Model.TargetThisMonth.ToString("N0")</div>
+                <div class="fw-semibold text-white text-end" style="width: 30%;">@Model.AchievementThisMonth.ToString("N0")</div>
+                <div class="fw-bold text-info text-end" style="width: 14%;">@Model.RunRateThisMonth.ToString("N0")%</div>
+            </div>
+
+            <div class="row g-0 align-items-center" style="font-size: 0.85rem;">
+                <div class="text-nowrap text-start" style="width: 26%; font-size: 0.7rem; text-transform: uppercase;">Last Month</div>
+                <div class="fw-semibold text-end" style="width: 30%;">@Model.TargetLastMonth.ToString("N0")</div>
+                <div class="fw-semibold text-end" style="width: 30%;">@Model.AchievementLastMonth.ToString("N0")</div>
+                <div class="fw-bold text-info text-end" style="width: 14%;">@Model.RunRateLastMonth.ToString("N0")%</div>
+            </div>
+
+        </div>
+    </div>
+</div>
