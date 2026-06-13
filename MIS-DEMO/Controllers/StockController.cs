@@ -110,8 +110,19 @@ namespace MIS_DEMO.Controllers
 
             if (string.IsNullOrEmpty(userName)) return RedirectToAction("Login", "Account");
 
-            // 1. Get Stock and Apply Security Filters
+            // 1. Get Base Stock
             var stockQuery = _context.VW_STOCK_TEAM_VALUE.AsNoTracking().Where(x => x.StockQty > 0);
+
+            // ==========================================
+            // ---> THE NEW LOGIC <---
+            // If the user is NOT a Director, force the CostPrice > 0 rule
+            // ==========================================
+            if (userType != "DIRECTOR")
+            {
+                stockQuery = stockQuery.Where(x => x.CostPrice > 0);
+            }
+
+            // Apply standard Security Filters
             stockQuery = ApplyStockRoleFilter(stockQuery, userName, userType, salesRepCode, teamCode);
 
             // 2. Group by Item, Sum Quantity, and Sort (NO .Take(10) limit!)
@@ -125,8 +136,6 @@ namespace MIS_DEMO.Controllers
                 .OrderByDescending(x => x.TotalQuantity)
                 .ToList();
 
-            // We can reuse your existing Ajax Model, or if you created a specific 
-            // 'AllStockItemsViewModel', you can use that here instead.
             var vm = new TopStockItemsKpiAjaxModel
             {
                 TopItems = allItems

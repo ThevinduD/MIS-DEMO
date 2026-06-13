@@ -469,8 +469,19 @@ namespace MIS_DEMO.Controllers
 
             if (string.IsNullOrEmpty(userName)) return Unauthorized();
 
-            // 1. Get Stock and Apply Security Filters
+            // 1. Get Base Stock
             var stockQuery = _context.VW_STOCK_TEAM_VALUE.AsNoTracking().Where(x => x.StockQty > 0);
+
+            // ==========================================
+            // ---> THE NEW LOGIC <---
+            // If the user is NOT a Director, force the CostPrice > 0 rule
+            // ==========================================
+            if (userType != "DIRECTOR")
+            {
+                stockQuery = stockQuery.Where(x => x.CostPrice > 0);
+            }
+
+            // Apply standard Security Filters
             stockQuery = ApplyStockRoleFilter(stockQuery, userName, userType, salesRepCode, teamCode);
 
             // 2. Group by ItemID & Description, Sum the QUANTITY, Sort, and Take Top 10
@@ -479,10 +490,9 @@ namespace MIS_DEMO.Controllers
                 .Select(g => new TopStockItemRow
                 {
                     ItemName = g.Key.Description ?? "UNKNOWN ITEM",
-
                     TotalQuantity = g.Sum(x => (decimal?)x.StockQty) ?? 0
                 })
-                .OrderByDescending(x => x.TotalQuantity) // Sort by Quantity now
+                .OrderByDescending(x => x.TotalQuantity) // Sort by Quantity
                 .Take(10)
                 .ToList();
 

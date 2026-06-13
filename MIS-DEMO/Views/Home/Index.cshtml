@@ -2,7 +2,14 @@
     ViewData["Title"] = "Home Page";
 }
 
-<h2>Dashboard</h2>
+<div class="d-flex justify-content-between align-items-center">
+    <h3 class="mb-0">Dashboard - Primary</h3>
+
+    <a href="/RD" class="btn btn-primary">
+        RD
+    </a>
+</div>
+
 
 <!-- KPI Cards -->
 <div class="row mt-4">
@@ -120,13 +127,13 @@
                         {
                             <tr class="border-bottom" style="border-color: #e2e8f0 !important;">
                                 <td class="text-start fw-bold text-dark ps-2">
-                                    <i class="bi bi-link-45deg text-primary me-2 fs-5 align-middle"></i>
+                                    <i class="bi bi-link-45deg text-primary  align-middle"></i>
                                     @link.LinkName
                                 </td>
                                 <td>
                                     <!-- The button pulls the Url directly from the DB -->
                                     <a href="@link.Url" class="btn btn-sm btn-outline-primary px-2 shadow-sm fw-semibold">
-                                        View <i class="bi bi-arrow-right-short align-middle ms-1" style="font-size: 1.1rem;"></i>
+                                        View <i class="bi bi-arrow-right-short align-middle" style="font-size: 1.1rem;"></i>
                                     </a>
                                 </td>
                             </tr>
@@ -279,30 +286,70 @@
         }
 
         function reloadSalesKpi() {
-            const container = document.getElementById('salesKpiContainer');
-            const team = document.getElementById('salesTeam')?.value || 'All';
-            const dateStr = document.getElementById('salesDate')?.value || '';
-            const category = document.getElementById('salesCategory')?.value || 'All'; // <-- Get Category
+            try {
+                var container = document.getElementById('salesKpiContainer');
 
-            let url = `/Home/LoadSalesKpi?team=${encodeURIComponent(team)}&category=${encodeURIComponent(category)}`; // <-- Attach Category
-            if (dateStr) {
-                url += `&filterDate=${dateStr}`;
+                // 1. Safe null checks instead of the modern '?.' operator
+                var teamEl = document.getElementById('salesTeam');
+                var team = (teamEl && teamEl.value) ? teamEl.value : 'All';
+
+                var dateEl = document.getElementById('salesDate');
+                var dateStr = (dateEl && dateEl.value) ? dateEl.value : '';
+
+                var categoryEl = document.getElementById('salesCategory');
+                var category = (categoryEl && categoryEl.value) ? categoryEl.value : 'All';
+
+                // 2. Safe string concatenation instead of modern backticks
+                var url = '/Home/LoadSalesKpi?team=' + encodeURIComponent(team) + '&category=' + encodeURIComponent(category);
+                if (dateStr) {
+                    url += '&filterDate=' + dateStr;
+                }
+
+                // Cache busting
+                url += '&_=' + new Date().getTime();
+
+                // 3. Using older standard function() instead of modern '() =>' arrows
+                fetch(url, {
+                    method: 'GET',
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                })
+                .then(function(res) {
+                    if (!res.ok) {
+                        throw new Error("Server status: " + res.status);
+                    }
+                    return res.text();
+                })
+                .then(function(html) {
+                    if (container) {
+                        container.innerHTML = html;
+                    }
+                })
+                .catch(function(err) {
+                    alert("Network/Fetch Error:\n" + err.message);
+                });
+
+            } catch (err) {
+                // If the iPad still crashes, this will finally catch it and pop up!
+                alert("Syntax/Code Crash:\n" + err.message);
             }
-
-            fetch(url)
-                .then(res => res.text())
-                .then(html => container.innerHTML = html)
-                .catch(err => console.error("Failed to load Sales KPI", err));
         }
 
         function passSalesFilters(event) {
             event.preventDefault();
-            const team = document.getElementById('salesTeam')?.value || 'All';
-            const dateStr = document.getElementById('salesDate')?.value || '';
 
-            let url = `/Sales/Details?team=${encodeURIComponent(team)}`;
+            var teamEl = document.getElementById('salesTeam');
+            var team = (teamEl && teamEl.value) ? teamEl.value : 'All';
+
+            var dateEl = document.getElementById('salesDate');
+            var dateStr = (dateEl && dateEl.value) ? dateEl.value : '';
+
+            var url = '/Sales/Details?team=' + encodeURIComponent(team);
             if (dateStr) {
-                url += `&filterDate=${dateStr}`;
+                url += '&filterDate=' + dateStr;
             }
 
             window.location.href = url;
